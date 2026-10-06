@@ -1,4 +1,4 @@
-const SYS_HINT = "请到 系统设置 → 隐私与安全性 → 录屏与系统录音 里允许「课堂同传」";
+const SYS_HINT = "请到 系统设置 → 隐私与安全 → 录屏与系统录音 里允许「课堂同传」";
 
 /** 窗口 ↔ 后台：每个窗口最多一节进行中的课 */
 export function registerIpc({ ipcMain, api, makeSession, makeSystemAudio }) {
