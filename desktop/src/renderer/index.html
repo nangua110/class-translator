@@ -63,7 +63,10 @@
     animation: blink 1s infinite; }
   .empty { color: var(--muted); padding: 40px 0; text-align: center; }
   [hidden] { display: none !important; }
-  .powered { text-align: center; font-size: 12px; color: var(--muted); padding: 0 0 10px; }
+  /* 署名：放在转写区底部状态栏右侧，不单独占一行 */
+  .powered { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; color: var(--muted);
+    opacity: .8; font-size: 12px; letter-spacing: .2px; white-space: nowrap; cursor: default; }
+  .powered b { color: #e8833a; font-weight: 600; }
   .tabs { display: inline-flex; background: var(--bg); border-radius: 10px; padding: 3px; gap: 2px; }
   .tab { border: none; background: none; padding: 4px 12px; font-size: 15px; font-weight: 600; color: var(--muted); border-radius: 8px; }
   .tab.on { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
@@ -141,6 +144,10 @@
     </div>
     <div class="card-foot" id="foot">
       <span id="recog" hidden><span class="pulse"></span></span><span id="footText">未开始录制</span>
+      <span class="powered" id="credit"><svg width="14" height="14" viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M32 14c-2-4 0-8 4-9" stroke="#6fb36b" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <ellipse cx="22" cy="38" rx="12" ry="16" fill="#f7934c"/><ellipse cx="42" cy="38" rx="12" ry="16" fill="#f7934c"/>
+        <ellipse cx="32" cy="38" rx="12" ry="17" fill="#ffa862"/></svg>Powered by <b>南瓜</b></span>
     </div>
   </section>
   <section class="card">
@@ -158,7 +165,6 @@
     <div class="scroll" id="report" hidden><div class="empty">点「结束录制」后，会自动把整节课整理成课后精讲：<br>章节大纲、AI 精讲、术语表、思考题和核心要点</div></div>
   </section>
 </main>
-<footer class="powered">Powered by 南瓜 · <span id="version"></span></footer>
 <div class="toast" id="toast"></div>
 <dialog id="privacy">
   <h3>使用前请看一下</h3>

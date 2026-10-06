@@ -369,7 +369,7 @@ apiFetch("/api/app-info").then((r) => r.json()).then((info) => {
   }
   if (!info.caps.appleTranslate) delete TRANSLATORS.apple;
   fillSelect($("translator"), TRANSLATORS, load("translator", "gemini", TRANSLATORS));
-  $("version").textContent = "v" + info.version;
+  $("credit").title = "课堂同传 v" + info.version; // 版本号放在悬停提示里
   listMics();
   if (!info.privacyAccepted) $("privacy").showModal();
 });

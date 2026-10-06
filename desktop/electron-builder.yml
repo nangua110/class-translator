@@ -15,6 +15,7 @@ mac:
     - target: dmg
       arch: [arm64, x64]
   category: public.app-category.education
+  icon: assets/icon.icns     # 「天空字幕」图标（源文件 assets/icon.svg）
   identity: null            # 暂不使用开发者证书（见设计文档 9.2），打包后做 ad-hoc 签名
   minimumSystemVersion: "12.0"
   extendInfo:

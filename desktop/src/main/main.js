@@ -70,6 +70,7 @@ async function runSmoke({ makeSession }) {
 async function main() {
   await app.whenReady();
   const deps = build();
+  if (!app.isPackaged && process.platform === "darwin") app.dock.setIcon(path.join(here, "../../assets/icon.png")); // 开发时程序坞也用新图标
   session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(perm === "media"));
   session.defaultSession.setPermissionCheckHandler((_wc, perm) => perm === "media");
   if (process.env.CT_SMOKE_WAV) return runSmoke(deps);
@@ -80,7 +81,8 @@ async function main() {
     mainWindow.webContents.once("did-finish-load", async () => {
       await new Promise((r) => setTimeout(r, 1500));
       const state = await mainWindow.webContents.executeJavaScript(
-        `JSON.stringify({ powered: document.querySelector(".powered")?.textContent, asr: [...document.querySelectorAll("#asr option")].map(o => o.textContent), speaker: document.querySelector("#speaker").value, speakers: [...document.querySelectorAll("#speaker option")].map(o => o.value) })`);
+        `JSON.stringify({ powered: document.querySelector(".powered")?.textContent.trim(), inFoot: !!document.querySelector(".card-foot .powered"), standalone: !!document.querySelector("footer.powered"), asr: [...document.querySelectorAll("#asr option")].map(o => o.textContent), speaker: document.querySelector("#speaker").value, speakers: [...document.querySelectorAll("#speaker option")].map(o => o.value) })`);
+      if (process.env.CT_SMOKE_SHOT) fs.writeFileSync(process.env.CT_SMOKE_SHOT, (await mainWindow.webContents.capturePage()).toPNG());
       console.log("window-loaded " + state);
       app.quit();
     });
