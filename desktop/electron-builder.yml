@@ -6,10 +6,17 @@ directories:
 files:
   - package.json
   - src/**
-extraResources:
-  - from: build/bin
-    to: bin
+  - assets/silero_vad.onnx
+  - assets/SILERO_LICENSE.txt
+  # onnxruntime-web 只带实际用到的 4 个文件（整个包 130 多 MB）
+  - "!node_modules/onnxruntime-web/dist/**"
+  - node_modules/onnxruntime-web/dist/ort.node.min.js
+  - node_modules/onnxruntime-web/dist/ort.node.min.mjs
+  - node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs
+  - node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm
 asar: true
+asarUnpack:
+  - node_modules/onnxruntime-web/dist/**   # WebAssembly 文件放在压缩包外，按文件路径加载更可靠
 mac:
   target:
     - target: dmg
@@ -18,6 +25,9 @@ mac:
   icon: assets/icon.icns     # 「天空字幕」图标（源文件 assets/icon.svg）
   identity: null            # 暂不使用开发者证书（见设计文档 9.2），打包后做 ad-hoc 签名
   minimumSystemVersion: "12.0"
+  extraResources:
+    - from: build/bin
+      to: bin
   extendInfo:
     NSMicrophoneUsageDescription: 课堂同传需要使用麦克风来识别老师说的话。
     NSAudioCaptureUsageDescription: 课堂同传需要录制电脑播放的声音，用来给视频和网课生成字幕。
@@ -27,3 +37,12 @@ dmg:
   title: 课堂同传
   # 文件名用英文：GitHub 发布页会把中文文件名去掉
   artifactName: ClassTranslator-${version}-${arch}.${ext}
+win:
+  target: nsis
+  icon: assets/icon.png
+nsis:
+  oneClick: false                         # 显示安装向导，可以选安装位置
+  perMachine: false                       # 装在当前用户下，不需要管理员权限
+  allowToChangeInstallationDirectory: true
+  shortcutName: 课堂同传
+  artifactName: ClassTranslator-${version}-win-${arch}-setup.${ext}
