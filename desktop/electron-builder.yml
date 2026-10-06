@@ -1,0 +1,27 @@
+appId: local.nangua.classtranslator
+productName: 课堂同传
+copyright: Powered by 南瓜
+directories:
+  output: dist
+files:
+  - package.json
+  - src/**
+extraResources:
+  - from: build/bin
+    to: bin
+asar: true
+mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  category: public.app-category.education
+  icon: assets/icon.icns     # 「天空字幕」图标（源文件 assets/icon.svg）
+  identity: null            # 暂不使用开发者证书（见设计文档 9.2），打包后做 ad-hoc 签名
+  minimumSystemVersion: "12.0"
+  extendInfo:
+    NSMicrophoneUsageDescription: 课堂同传需要使用麦克风来识别老师说的话。
+    NSAudioCaptureUsageDescription: 课堂同传需要录制电脑播放的声音，用来给视频和网课生成字幕。
+    NSSpeechRecognitionUsageDescription: 课堂同传使用苹果自带的语音识别，在这台电脑上把语音转成文字。
+afterSign: scripts/adhoc-sign.cjs
+dmg:
+  title: 课堂同传

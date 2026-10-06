@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- 课堂同传图标「天空字幕」：浅蓝到淡紫渐变，两行字幕 + 一条声波 -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a9d8ff"/><stop offset="1" stop-color="#c7b8ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#5a5f8a" flood-opacity=".22"/>
+    </filter>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)" filter="url(#shadow)"/>
+  <rect x="230" y="300" width="564" height="300" rx="60" fill="#fff" opacity=".9"/>
+  <rect x="300" y="380" width="424" height="44" rx="22" fill="#8fb4f5"/>
+  <rect x="300" y="470" width="300" height="44" rx="22" fill="#b6a6f2"/>
+  <g fill="#fff">
+    <rect x="372" y="680" width="34" height="80" rx="17"/>
+    <rect x="432" y="650" width="34" height="140" rx="17"/>
+    <rect x="492" y="630" width="34" height="180" rx="17"/>
+    <rect x="552" y="660" width="34" height="120" rx="17"/>
+    <rect x="612" y="690" width="34" height="60" rx="17"/>
+  </g>
+</svg>

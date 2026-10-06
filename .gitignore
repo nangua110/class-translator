@@ -8,3 +8,9 @@ __pycache__/
 apple_asr/apple_asr
 apple_asr/syscap
 apple_asr/apple_translate
+
+# 桌面版生成物
+desktop/node_modules/
+desktop/dist/
+desktop/build/
+desktop/src/renderer/vendor/
