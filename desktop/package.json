@@ -18,6 +18,7 @@
     "@anthropic-ai/sdk": "^0.131.0",
     "@google/genai": "^2.27.0",
     "marked": "^18.1.0",
+    "onnxruntime-web": "^1.30.0",
     "opencc-js": "^1.4.2"
   },
   "devDependencies": {
