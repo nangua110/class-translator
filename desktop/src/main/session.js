@@ -1,6 +1,7 @@
 import { TARGET_LANGS, TRANSLATORS, SPEAKER_LANGS, SR, SUMMARY_INTERVAL_MS } from "./langs.js";
 import { simplify, friendly } from "./text.js";
 import { acceptFinal, acceptPartial } from "./apple/filter.js";
+import { acceptCloudFinal } from "./cloud/filter.js";
 import { AllModelsBusy, NoKey } from "./llm/errors.js";
 
 const DEFAULTS = { speaker: "en", target: "zh", asr: "apple", translator: "gemini" };
@@ -33,7 +34,7 @@ export class Session {
 
   configure(cfg = {}) {
     const speakerChanged = cfg.speaker && this.asr && cfg.speaker !== this.asr.speaker;
-    if (this.asr && (speakerChanged || (cfg.asr && cfg.asr !== "apple"))) {
+    if (this.asr && (speakerChanged || (cfg.asr && cfg.asr !== this.asr.kind))) {
       const old = this.asr; // 说到一半的那句会先确定下来
       this.asr = null;
       old.close();
@@ -53,21 +54,29 @@ export class Session {
     this.send({ type: "error", msg });
   }
 
+  /** 这节课用哪种识别：苹果（新 Mac）或云端（Gemini）；都用不了返回 null */
+  asrKind() {
+    if (this.cfg.asr === "apple" && this.caps.appleAsr) return "apple";
+    if (this.cfg.asr === "cloud" && this.caps.cloudAsr) return "cloud";
+    return null;
+  }
+
   audio(buf) {
     if (this.paused) return;
-    if (this.cfg.asr !== "apple" || !this.caps.appleAsr) {
-      return this.warnOnce("no-asr", "这台电脑暂时不能识别语音：苹果自带识别需要 macOS 26 或更新。旧电脑的云端识别会在下个版本加入。");
+    const kind = this.asrKind();
+    if (!kind) {
+      return this.warnOnce("no-asr", "这台电脑用不了苹果自带识别（需要 macOS 26 或更新），请在「识别方式」里选「云端（Gemini）」。");
     }
-    if (this.appleFailed === this.cfg.speaker) {
-      return this.warnOnce("crash", "苹果识别连续出错，已停止识别。请结束录制后重新开始；如果还不行，检查系统设置里的语音识别是否可用。");
+    if (kind === "apple" && this.appleFailed === this.cfg.speaker) {
+      return this.warnOnce("crash", "苹果识别连续出错，已停止识别。请结束录制后重新开始，或者在「识别方式」里改用「云端（Gemini）」。");
     }
-    if (!this.asr) this.startAsr();
+    if (!this.asr) this.startAsr(kind);
     this.asr.feed(buf);
     this.samples += buf.length / 2;
   }
 
-  startAsr() {
-    const asr = this.makeAsr(this.cfg.speaker, this.samples / SR);
+  startAsr(kind) {
+    const asr = this.makeAsr(kind, this.cfg.speaker, this.samples / SR, () => this.cfg.target);
     asr.on("message", (m) => this.onAsr(asr, m));
     asr.on("exit", (code) => {
       if (this.asr === asr) this.asr = null;
@@ -83,14 +92,19 @@ export class Session {
   onAsr(asr, m) {
     if (m.type === "partial") {
       if (acceptPartial(m.text ?? "", asr.speaker)) this.send({ type: "partial", text: m.text });
+    } else if (m.type === "final" && m.source === "cloud") {
+      const r = acceptCloudFinal(m, asr.speaker);
+      if (r) this.addLine(r.text, r.lang, r.tr, asr.offset + r.start);
     } else if (m.type === "final") {
       this.send({ type: "partial", text: "" });
       const r = acceptFinal(m, asr.speaker);
       if (r) this.addLine(r.text, r.lang, "", asr.offset + r.start);
+    } else if (m.type === "status") {
+      this.send({ type: "status", recognizing: !!m.recognizing });
     } else if (m.type === "downloading") {
       this.send({ type: "error", msg: "第一次用这种语言，正在下载苹果语音模型，稍等片刻…" });
     } else if (m.type === "error") {
-      this.send({ type: "error", msg: `苹果识别出错：${String(m.msg ?? "").slice(0, 60)}` });
+      this.send({ type: "error", msg: asr.kind === "cloud" ? m.msg : `苹果识别出错：${String(m.msg ?? "").slice(0, 60)}` });
     }
   }
 
