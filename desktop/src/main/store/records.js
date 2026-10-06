@@ -39,6 +39,7 @@ export function reportMarkdown(outline, body, stem, lastTs) {
 export class Records {
   constructor(dir) { this.dir = dir; }
   newName() { return newRecordName(); }
+  ensureDir() { fs.mkdirSync(this.dir, { recursive: true }); }
   #file(name) {
     if (!isValidName(name)) throw new Error("记录名不合法");
     return path.join(this.dir, name);

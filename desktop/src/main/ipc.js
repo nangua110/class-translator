@@ -16,8 +16,10 @@ export function registerIpc({ ipcMain, api, makeSession, makeSystemAudio }) {
   ipcMain.handle("session:open", (e) => {
     const wc = e.sender;
     closeFor(wc.id);
-    const send = (m) => { if (!wc.isDestroyed()) wc.send("session:msg", m); };
-    const session = makeSession(send);
+    let session = null;
+    // 每条消息都带上所属课的标识，窗口据此丢掉上一节课迟到的消息
+    const send = (m) => { if (!wc.isDestroyed()) wc.send("session:msg", { ...m, sid: session?.name }); };
+    session = makeSession(send);
     live.set(wc.id, { session, sys: null, send });
     wc.once("destroyed", () => closeFor(wc.id)); // 关窗口：存盘并杀掉子程序
     return { record: session.name };
@@ -49,7 +51,12 @@ export function registerIpc({ ipcMain, api, makeSession, makeSystemAudio }) {
     else if (cmd === "stop") {
       x.sys?.stop();
       x.sys = null;
-      await x.session.stop();
+      try {
+        await x.session.stop();
+      } catch (err) { // 收尾出错也一定通知窗口结束，免得界面一直卡在"收尾中"
+        x.send({ type: "error", msg: `结束录制时出错：${String(err?.message ?? err).slice(0, 80)}` });
+        x.send({ type: "done", record: x.session.name });
+      }
     }
   });
 

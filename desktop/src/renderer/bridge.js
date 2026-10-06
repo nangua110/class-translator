@@ -5,17 +5,22 @@ window.apiFetch = async (url, opts = {}) => {
   return { json: async () => data };
 };
 
+// 同一时间只有一节课：开新课时先断开上一节课的监听，并且只收带本节课标识（sid）的消息，
+// 免得上一节课收尾时迟到的消息（比如 done）串到新课里
+let current = null;
 window.openSessionSocket = async () => {
-  const sock = { readyState: 0, onmessage: null };
-  const off = window.api.onMessage((m) => sock.onmessage?.({ data: JSON.stringify(m) }));
-  await window.api.openSession();
+  if (current) { current.readyState = 3; current.off(); }
+  const sock = { readyState: 0, onmessage: null, sid: null };
+  sock.off = window.api.onMessage((m) => { if (sock.sid && m.sid === sock.sid) sock.onmessage?.({ data: JSON.stringify(m) }); });
+  current = sock;
+  sock.sid = (await window.api.openSession()).record;
   sock.readyState = 1;
   sock.send = (d) => (typeof d === "string" ? window.api.sendCmd(d) : window.api.sendAudio(d));
   sock.close = () => {
     if (sock.readyState !== 1) return;
     sock.readyState = 3;
-    off();
-    window.api.closeSession();
+    sock.off();
+    if (current === sock) { current = null; window.api.closeSession(); }
   };
   return sock;
 };

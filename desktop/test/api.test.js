@@ -108,3 +108,19 @@ test("其他接口", async () => {
   assert.deepEqual(await api("/api/pdf", "POST", { html: "<p>x</p>", name: "a/b:c" }), { ok: true, file: "/tmp/a_b_c.pdf" });
   await assert.rejects(api("/api/nope", "GET"), /未知接口/);
 });
+
+test("历史记录列表用界面认得的字段名 has_report", async () => {
+  const { api, records } = setup();
+  records.save(NAME, "", lines3);
+  records.writeReport(NAME, "# 标题\n");
+  const [item] = await api("/api/records", "GET");
+  assert.equal(item.has_report, true);
+  assert.equal(item.title, "标题");
+});
+
+test("点「我知道了」时先建好记录文件夹，让系统的文稿权限询问提前弹出", async () => {
+  const { api, records } = setup();
+  assert.equal(fs.existsSync(records.dir), false);
+  await api("/api/privacy-accepted", "POST");
+  assert.equal(fs.existsSync(records.dir), true);
+});

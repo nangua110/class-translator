@@ -5,6 +5,7 @@ marked.use({ breaks: true });
 const md2html = (md) => marked.parse(md.replace(/\*\*([^*\n]+?)\*\*/g, "<strong>$1</strong>"));
 let ws, ctx, stream, node, timerId;
 let state = "idle"; // idle | recording | paused
+let finishing = false; // 点了结束、后台还在收尾：这期间不能开新课
 let elapsed = 0, lastTick = 0, summaryMd = "";
 const SYSTEM = "__system__"; // 音源选"电脑内部声音"：由服务端直接录系统声音，不用麦克风
 const lines = {};
@@ -22,7 +23,7 @@ function fillSelect(el, options, value) {
   el.innerHTML = Object.entries(options).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
   el.value = value;
 }
-fillSelect($("speaker"), SPEAKERS, load("speaker", "auto", SPEAKERS));
+fillSelect($("speaker"), SPEAKERS, load("speaker", "en", SPEAKERS));
 fillSelect($("target"), TARGETS, load("target", "zh", TARGETS));
 fillSelect($("asr"), ASRS, load("asr2", "apple", ASRS));
 fillSelect($("translator"), TRANSLATORS, load("translator", "gemini", TRANSLATORS));
@@ -58,7 +59,7 @@ function setFoot(r = recognizing) {
 function setState(s) {
   state = s;
   setFoot();
-  $("startBtn").disabled = s !== "idle";
+  $("startBtn").disabled = s !== "idle" || finishing;
   $("pauseBtn").disabled = s === "idle";
   $("pauseBtn").textContent = s === "paused" ? "继续" : "暂停";
   $("stopBtn").disabled = s === "idle";
@@ -116,6 +117,8 @@ function onMessage(ev) {
   } else if (m.type === "summary_status") $("sumBadge").textContent = m.busy ? "归纳中…" : "已更新";
   else if (m.type === "error") toast(m.msg);
   else if (m.type === "done") {
+    finishing = false;
+    setState(state);
     toast("已保存到「文稿/课堂同传」");
     ws.close();
     showTab("report");
@@ -166,7 +169,7 @@ $("pauseBtn").onclick = () => {
   if (ws?.readyState === 1) ws.send(state === "paused" ? "pause" : "resume");
 };
 $("stopBtn").onclick = () => {
-  if (ws?.readyState === 1) ws.send("stop");
+  if (ws?.readyState === 1) { ws.send("stop"); finishing = true; }
   $("sumBadge").textContent = "生成最终总结…";
   stopLocal();
 };
@@ -360,6 +363,10 @@ apiFetch("/api/app-info").then((r) => r.json()).then((info) => {
     ? { apple: "苹果自带（最快，边说边出字）" }
     : { none: "暂不支持（需要 macOS 26，下个版本加入云端识别）" });
   fillSelect($("asr"), ASRS, Object.keys(ASRS)[0]);
+  if (info.caps.appleAsr) { // 苹果识别要事先指定一种语言，做不到「自动（中/英）」
+    delete SPEAKERS.auto;
+    fillSelect($("speaker"), SPEAKERS, load("speaker", "en", SPEAKERS));
+  }
   if (!info.caps.appleTranslate) delete TRANSLATORS.apple;
   fillSelect($("translator"), TRANSLATORS, load("translator", "gemini", TRANSLATORS));
   $("version").textContent = "v" + info.version;

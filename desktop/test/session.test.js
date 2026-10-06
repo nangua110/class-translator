@@ -147,3 +147,14 @@ test("暂停时不送音频", () => {
   s.audio(pcm(1));
   assert.equal(asrs.length, 0);
 });
+
+test("文稿文件夹写不进去：只提示一次，不抛错，字幕照常出", async () => {
+  const { s, sent, asrs } = setup();
+  s.records.save = () => { throw Object.assign(new Error("EPERM: operation not permitted"), { code: "EPERM" }); };
+  s.audio(pcm(1));
+  asrs[0].emit("message", final("First line."));
+  asrs[0].emit("message", final("Second line."));
+  await s.idle();
+  assert.equal(sent.filter((m) => m.type === "line").length, 2);
+  assert.equal(errors(sent).filter((m) => m.includes("文稿")).length, 1);
+});

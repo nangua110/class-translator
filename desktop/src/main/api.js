@@ -72,11 +72,14 @@ export function createApi({ settings, llm, appleTr, records, caps, version, open
     const q = u.searchParams;
     switch (`${method} ${u.pathname}`) {
       case "GET /api/app-info": return { caps, version, privacyAccepted: settings.pref("privacyAccepted", false) };
-      case "POST /api/privacy-accepted": settings.setPref("privacyAccepted", true); return { ok: true };
+      case "POST /api/privacy-accepted":
+        settings.setPref("privacyAccepted", true);
+        try { records.ensureDir(); } catch {} // 让系统的「文稿」权限询问在这时弹出，而不是上课中途
+        return { ok: true };
       case "POST /api/mic-access": return { granted: await askMic() };
       case "GET /api/settings": return getSettings(q);
       case "POST /api/settings": return saveSettings(body);
-      case "GET /api/records": return records.list();
+      case "GET /api/records": return records.list().map((r) => ({ ...r, has_report: r.hasReport })); // 界面沿用网页版字段名
       case "GET /api/report": {
         const r = records.readReport(q.get("record"));
         return r ? { ok: true, ...r } : { ok: false };

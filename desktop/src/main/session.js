@@ -213,5 +213,12 @@ export class Session {
     this.save();
   }
 
-  save() { if (this.lines.length) this.records.save(this.name, this.summary, this.lines); }
+  save() {
+    if (!this.lines.length) return;
+    try {
+      this.records.save(this.name, this.summary, this.lines);
+    } catch (e) { // 比如没允许访问「文稿」或磁盘满：字幕照常出，只提示一次；之后能写了会整份重存
+      this.warnOnce("save", `课堂记录保存不了（${e.code ?? e.message}）。请到 系统设置 → 隐私与安全性 → 文件与文件夹 里允许「课堂同传」访问「文稿」文件夹`);
+    }
+  }
 }

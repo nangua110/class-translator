@@ -12,17 +12,19 @@ export class AppleASR extends EventEmitter {
     this.p = null;
   }
   start() {
+    this.byUs = false; // 是我们自己 close / kill 的；被系统信号意外结束（真崩溃）不算
     this.p = spawnJsonl(this.bin, [APPLE_LOCALES[this.speaker] ?? "en-US"], (m) => this.emit("message", m));
-    this.p.done.then((code) => this.emit("exit", code));
+    this.p.done.then((code) => this.emit("exit", this.byUs ? -1 : (code === -1 ? 128 : code)));
   }
   feed(buf) { this.p?.write(buf); }
   /** 不再送音频，等最后一句确定下来；超时就强制结束 */
   async close(timeoutMs = 10_000) {
     if (!this.p) return;
+    this.byUs = true;
     this.p.end();
     const timer = setTimeout(() => this.p.kill(), timeoutMs);
     await this.p.done;
     clearTimeout(timer);
   }
-  kill() { this.p?.kill(); }
+  kill() { this.byUs = true; this.p?.kill(); }
 }

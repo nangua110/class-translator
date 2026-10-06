@@ -80,7 +80,7 @@ async function main() {
     mainWindow.webContents.once("did-finish-load", async () => {
       await new Promise((r) => setTimeout(r, 1500));
       const state = await mainWindow.webContents.executeJavaScript(
-        `JSON.stringify({ powered: document.querySelector(".powered")?.textContent, asr: [...document.querySelectorAll("#asr option")].map(o => o.textContent) })`);
+        `JSON.stringify({ powered: document.querySelector(".powered")?.textContent, asr: [...document.querySelectorAll("#asr option")].map(o => o.textContent), speaker: document.querySelector("#speaker").value, speakers: [...document.querySelectorAll("#speaker option")].map(o => o.value) })`);
       console.log("window-loaded " + state);
       app.quit();
     });

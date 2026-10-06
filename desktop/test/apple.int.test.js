@@ -49,6 +49,16 @@ test("苹果识别：被 kill 时 exit 为 -1", { skip, timeout: 30_000 }, async
   assert.equal(await exited, -1);
 });
 
+test("苹果识别被系统信号意外结束（真崩溃）不能当成我们自己关的", { skip, timeout: 30_000 }, async () => {
+  const asr = new AppleASR(bins.asr, "en", 0);
+  const exited = new Promise((r) => asr.on("exit", r));
+  asr.start();
+  await new Promise((r) => setTimeout(r, 300));
+  process.kill(asr.p.proc.pid, "SIGSEGV");
+  assert.notEqual(await exited, -1);
+  assert.notEqual(await exited, 0);
+});
+
 test("苹果翻译：状态查询；不支持的语言直接返回 unsupported", { skip, timeout: 30_000 }, async () => {
   const tr = new AppleTranslator(bins.translate);
   assert.ok(["installed", "supported"].includes(await tr.status("en", "zh")));
