@@ -10,7 +10,15 @@ let elapsed = 0, lastTick = 0, summaryMd = "";
 const SYSTEM = "__system__"; // 音源选"电脑内部声音"：由服务端直接录系统声音，不用麦克风
 const lines = {};
 const SPEAKERS = { auto: "自动（中/英）", en: "英语", zh: "中文", ja: "日语", ko: "韩语", fr: "法语", de: "德语", es: "西班牙语" };
-const ASRS = { apple: "苹果自带（最快，边说边出字）", cloud: "云端（Gemini，不发热）", local: "本地（Whisper，免费）" };
+const ASRS = { apple: "苹果自带（最快，边说边出字）", cloud: "云端（Gemini，需要填 key）" };
+const ALL_SPEAKERS = { ...SPEAKERS };
+// 苹果识别要事先指定一种语言，做不到「自动（中/英）」；云端识别可以
+function refreshSpeakers() {
+  for (const k of Object.keys(SPEAKERS)) delete SPEAKERS[k];
+  Object.assign(SPEAKERS, ALL_SPEAKERS);
+  if ($("asr").value === "apple") delete SPEAKERS.auto;
+  fillSelect($("speaker"), SPEAKERS, load("speaker", "en", SPEAKERS));
+}
 const TRANSLATORS = { gemini: "Gemini（推荐，会纠正识别错字）", claude: "Claude（会纠正识别错字）", apple: "苹果自带（免费、本地、直译）" };
 const TARGETS = { zh: "简体中文", en: "英语", ja: "日语", ko: "韩语", fr: "法语", de: "德语", es: "西班牙语" };
 
@@ -30,12 +38,14 @@ fillSelect($("translator"), TRANSLATORS, load("translator", "gemini", TRANSLATOR
 function sendLangs() {
   if (ws?.readyState === 1) ws.send(JSON.stringify({
     speaker: $("speaker").value, target: $("target").value, asr: $("asr").value, translator: $("translator").value,
-    source: $("mic").value === SYSTEM ? "system" : "mic",
+    // Mac 的电脑内部声音由后台的 syscap 录；Windows 的系统回环在窗口里录，和麦克风走同一条路
+    source: $("mic").value === SYSTEM && !window.APP_INFO?.caps.loopback ? "system" : "mic",
   }));
 }
 for (const id of ["speaker", "target", "asr", "translator"])
   $(id).onchange = () => {
     try { localStorage.setItem(id === "asr" ? "asr2" : id, $(id).value); } catch {}
+    if (id === "asr") refreshSpeakers();
     sendLangs();
     if (state !== "idle") toast("已切换，从下一句开始生效");
   };
@@ -72,9 +82,17 @@ function setState(s) {
 async function listMics() {
   await apiFetch("/api/mic-access", { method: "POST" }); // 先走系统的麦克风授权
   try { (await navigator.mediaDevices.getUserMedia({ audio: true })).getTracks().forEach((t) => t.stop()); } catch {}
-  const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput");
+  const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput" && d.deviceId);
+  const caps = window.APP_INFO?.caps ?? {};
   $("mic").innerHTML = devs.map((d) => `<option value="${d.deviceId}">${d.label || "麦克风"}</option>`).join("")
-    + (window.APP_INFO?.caps.systemAudio ? `<option value="${SYSTEM}">电脑内部声音（视频/电影）</option>` : "");
+    + (caps.systemAudio ? `<option value="${SYSTEM}">电脑内部声音（视频/电影）</option>` : "");
+  if (!devs.length) {
+    $("mic").insertAdjacentHTML("afterbegin", '<option value="" disabled>没有找到麦克风</option>');
+    if (!caps.systemAudio) $("mic").value = "";
+    toast(caps.platform === "win32"
+      ? "没有找到麦克风：请到 设置 → 隐私和安全性 → 麦克风，打开「允许桌面应用访问麦克风」"
+      : "没有找到麦克风：请到 系统设置 → 隐私与安全 → 麦克风，允许「课堂同传」");
+  }
 }
 
 function addLine({ id, t, text, tr, same }) {
@@ -119,7 +137,7 @@ function onMessage(ev) {
   else if (m.type === "done") {
     finishing = false;
     setState(state);
-    toast("已保存到「文稿/课堂同传」");
+    toast("已保存到课堂记录文件夹");
     ws.close();
     showTab("report");
     loadRecords(m.record).then(() => makeReport(m.record)); // 下课后自动生成课后精讲
@@ -127,11 +145,18 @@ function onMessage(ev) {
 }
 
 async function start() {
-  const system = $("mic").value === SYSTEM;
-  if (!system)
+  // Mac 的电脑内部声音由后台录（system=true）；Windows 的系统回环在这里录，和麦克风走同一条路
+  const loopback = $("mic").value === SYSTEM && !!window.APP_INFO?.caps.loopback;
+  const system = $("mic").value === SYSTEM && !loopback;
+  if (loopback) {
+    stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+    stream.getVideoTracks().forEach((t) => t.stop()); // 只要声音
+    if (!stream.getAudioTracks().length) throw new Error("没有录到电脑声音");
+  } else if (!system) {
     stream = await navigator.mediaDevices.getUserMedia({
       audio: { deviceId: $("mic").value || undefined, echoCancellation: false, noiseSuppression: true, autoGainControl: true },
     });
+  }
   ws = await openSessionSocket();
   ws.onmessage = onMessage;
   sendLangs(); // 选了电脑内部声音时，服务端收到后就开始录
@@ -248,7 +273,7 @@ async function makeReport(record) {
   $("repBadge").textContent = "已生成";
   await loadRecords(record);     // 刷新列表里的"已生成"标记
   setReportView(r.md, r.title);
-  toast(`课后精讲已保存：文稿/课堂同传/${r.file}`);
+  toast(`课后精讲已保存：${r.file}`);
 }
 
 function download(name, text) {
@@ -358,15 +383,10 @@ $("settingsSave").onclick = async () => {
 // App：按这台电脑能用的功能调整选项，第一次打开先看隐私说明
 apiFetch("/api/app-info").then((r) => r.json()).then((info) => {
   window.APP_INFO = info;
-  for (const k of Object.keys(ASRS)) delete ASRS[k];
-  Object.assign(ASRS, info.caps.appleAsr
-    ? { apple: "苹果自带（最快，边说边出字）" }
-    : { none: "暂不支持（需要 macOS 26，下个版本加入云端识别）" });
-  fillSelect($("asr"), ASRS, Object.keys(ASRS)[0]);
-  if (info.caps.appleAsr) { // 苹果识别要事先指定一种语言，做不到「自动（中/英）」
-    delete SPEAKERS.auto;
-    fillSelect($("speaker"), SPEAKERS, load("speaker", "en", SPEAKERS));
-  }
+  if (!info.caps.appleAsr) delete ASRS.apple;
+  fillSelect($("asr"), ASRS, load("asr2", Object.keys(ASRS)[0], ASRS));
+  refreshSpeakers();
+  for (const el of document.querySelectorAll(".apple-only")) el.hidden = !(info.caps.appleAsr || info.caps.appleTranslate);
   if (!info.caps.appleTranslate) delete TRANSLATORS.apple;
   fillSelect($("translator"), TRANSLATORS, load("translator", "gemini", TRANSLATORS));
   $("credit").title = "课堂同传 v" + info.version; // 版本号放在悬停提示里
