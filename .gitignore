@@ -14,3 +14,6 @@ desktop/node_modules/
 desktop/dist/
 desktop/build/
 desktop/src/renderer/vendor/
+
+# 执行计划时的临时记录
+.superpowers/
