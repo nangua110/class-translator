@@ -190,7 +190,14 @@ function stopLocal() {
   setFoot(false);
 }
 
-$("startBtn").onclick = () => start().catch((e) => { toast("启动失败：" + e.message + "（服务是否在运行？）"); stopLocal(); });
+$("startBtn").onclick = () => start().catch((e) => {
+  const caps = window.APP_INFO?.caps ?? {};
+  const source = $("mic").value === SYSTEM && caps.loopback ? "loopback" : "mic";
+  toast(startErrorText(e, caps.platform, source));
+  console.warn("开始录制失败", e?.name, e?.message); // 原始报错留给排查用
+  ws?.close();
+  stopLocal();
+});
 $("pauseBtn").onclick = () => {
   setState(state === "paused" ? "recording" : "paused");
   if (ws?.readyState === 1) ws.send(state === "paused" ? "pause" : "resume");

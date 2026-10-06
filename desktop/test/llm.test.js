@@ -114,3 +114,14 @@ test("云端识别：自动模式不加说话人提示；没 key 抛 NoKey", asy
   const none = new LLM(settings(), { gemini: () => fakeGemini(), claude: () => ({}) });
   await assert.rejects(none.recognize(Buffer.from("x"), null, "简体中文"), NoKey);
 });
+
+test("模型都因为超时 / 服务器忙在冷却：报的是「网络慢」不是「额度用完」", async () => {
+  const pool = new GeminiPool(fakeGemini({ a: "hang", b: err(503, "UNAVAILABLE") }), () => 0);
+  await assert.rejects(pool.generate(["a", "b"], {}, 20));
+  const e = await pool.generate(["a", "b"], {}, 20).catch((x) => x);
+  assert.ok(e instanceof AllModelsBusy);
+  assert.equal(e.quota, false);
+  const quota = new GeminiPool(fakeGemini({ a: err(429, "PerDay"), b: err(429, "PerDay") }), () => 0);
+  await assert.rejects(quota.generate(["a", "b"], {}, 20));
+  assert.equal((await quota.generate(["a", "b"], {}, 20).catch((x) => x)).quota, true);
+});

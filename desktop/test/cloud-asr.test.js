@@ -100,3 +100,49 @@ test("acceptCloudFinal：只留所选语言；自动模式中英都留；奇怪�
   assert.equal(acceptCloudFinal({ text: "Thank you.", lang: "en", tr: "", start: 0 }, "en"), null, "常见胡编句丢掉");
   assert.equal(acceptCloudFinal({ text: "", lang: "en", tr: "", start: 0 }, "en"), null);
 });
+
+test("网络慢 / 服务器忙（不是额度用完）：不暂停 10 分钟，下一句照常请求，提示的是网络问题", async () => {
+  const { asr, calls, msgs } = setup({ recognize: (n) => { if (n === 1) throw new AllModelsBusy("x", { quota: false }); return { text: "Ok.", lang: "en", tr: "" }; } });
+  asr.feed(sentence()); asr.feed(sentence());
+  await asr.close();
+  assert.equal(calls.length, 2);
+  assert.equal(finals(msgs).length, 1);
+  assert.match(errors(msgs)[0], /网络/);
+  assert.doesNotMatch(errors(msgs)[0], /额度/);
+});
+
+test("识别跟不上时最多积压 3 句：跳过最旧的，只提示一次", async () => {
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const { asr, calls, msgs } = setup({ recognize: async (n) => { if (n === 1) await gate; return { text: `第${n}句`, lang: "zh", tr: "" }; } });
+  for (let i = 0; i < 7; i++) asr.feed(sentence());
+  await new Promise((r) => setTimeout(r, 20));
+  release();
+  await asr.close();
+  assert.equal(calls.length, 4, "第 1 句 + 最新的 3 句");
+  assert.equal(errors(msgs).filter((m) => m.includes("跳过")).length, 1);
+});
+
+test("人声检测出错：提示一次，照常识别", async () => {
+  const calls = [], msgs = [];
+  const asr = new CloudASR({
+    llm: { recognize: async () => { calls.push(1); return { text: "Hi.", lang: "en", tr: "" }; } },
+    vad: { hasVoice: async () => { throw new Error("wasm 加载失败"); } },
+    speaker: "en", offset: 0, getTarget: () => "zh",
+  });
+  asr.on("message", (m) => msgs.push(m));
+  asr.feed(sentence()); asr.feed(sentence());
+  await asr.close();
+  assert.equal(calls.length, 2);
+  assert.equal(errors(msgs).length, 1);
+  assert.match(errors(msgs)[0], /人声检测/);
+});
+
+test("自动模式只留中英文：日语、韩语丢掉；other 里有假名或韩文也丢掉", () => {
+  assert.equal(acceptCloudFinal({ text: "今日は熱力学です", lang: "ja", tr: "", start: 0 }, "auto"), null);
+  assert.equal(acceptCloudFinal({ text: "안녕하세요", lang: "ko", tr: "", start: 0 }, "auto"), null);
+  assert.equal(acceptCloudFinal({ text: "Bonjour", lang: "fr", tr: "", start: 0 }, "auto"), null);
+  assert.equal(acceptCloudFinal({ text: "こんにちは", lang: "other", tr: "", start: 0 }, "auto"), null);
+  assert.equal(acceptCloudFinal({ text: "안녕", lang: "other", tr: "", start: 0 }, "auto"), null);
+  assert.equal(acceptCloudFinal({ text: "同学们好", lang: "other", tr: "", start: 0 }, "auto").lang, "zh");
+});

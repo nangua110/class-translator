@@ -60,7 +60,7 @@ export class LLM {
     ] }];
     const config = { systemInstruction: RECOGNIZE_SYSTEM(hint, targetLabel), responseMimeType: "application/json", responseJsonSchema: RECOGNIZE_SCHEMA };
     const models = orderModels(FAST_MODELS, this.settings.pref("geminiModel", "auto"));
-    const resp = await this.gemini.generate(models, { contents, config }, 6_000); // 正常 1~2 秒就回
+    const resp = await this.gemini.generate(models, { contents, config }, 15_000); // 正常几秒就回；8 秒录音上传要时间，网络慢时留足余量
     const r = parseJson(resp.text ?? "");
     return { text: String(r.text ?? "").trim(), lang: String(r.lang ?? ""), tr: String(r.translation ?? "").trim() };
   }

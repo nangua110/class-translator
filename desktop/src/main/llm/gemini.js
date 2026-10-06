@@ -14,6 +14,7 @@ export class GeminiPool {
     this.client = client;
     this.now = now;
     this.cooldown = new Map();
+    this.reason = new Map(); // 模型 → 冷却原因：quota（额度用完）/ busy（超时、繁忙）
   }
   async generate(models, request, timeoutMs) {
     let lastErr = null;
@@ -24,6 +25,7 @@ export class GeminiPool {
       } catch (e) {
         const status = e?.status ?? e?.code;
         const msg = String(e?.message ?? e);
+        this.reason.set(model, status === 429 && msg.includes("PerDay") ? "quota" : "busy");
         if (e instanceof TimeoutError) this.cooldown.set(model, this.now() + 60_000);
         else if (status === 429 && msg.includes("PerDay")) {
           const m = msg.match(/retryDelay["']?\s*:\s*["']?(\d+)s/);
@@ -34,6 +36,8 @@ export class GeminiPool {
         lastErr = e;
       }
     }
-    throw lastErr ?? new AllModelsBusy("所有模型都在冷却中");
+    if (lastErr) throw lastErr;
+    const quota = models.every((m) => this.reason.get(m) === "quota");
+    throw new AllModelsBusy("所有模型都在冷却中", { quota });
   }
 }
