@@ -45,4 +45,8 @@ nsis:
   perMachine: false                       # 装在当前用户下，不需要管理员权限
   allowToChangeInstallationDirectory: true
   shortcutName: 课堂同传
+  # ARM64 版安装程序里的程序文件用 zip（x64 版在 dist:win 里改回 7z，体积小、没这个问题）：新版 7-Zip 会给 ARM64 的 exe/dll 加「ARM64 过滤器」，
+  # 安装程序自带的旧解压组件不认识，会悄悄跳过这些文件（ARM64 版装完缺主程序）
+  useZip: true
+  differentialPackage: false   # 不做差分更新（没用到自动更新）；开着时 electron-builder 会忽略 useZip 仍用 7z
   artifactName: ClassTranslator-${version}-win-${arch}-setup.${ext}

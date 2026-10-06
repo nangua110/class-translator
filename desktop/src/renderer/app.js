@@ -79,9 +79,11 @@ function setState(s) {
   if (s === "idle") renderLive("");
 }
 
+navigator.mediaDevices.addEventListener("devicechange", () => listMics()); // 插拔麦克风后自动刷新
 async function listMics() {
-  await apiFetch("/api/mic-access", { method: "POST" }); // 先走系统的麦克风授权
-  try { (await navigator.mediaDevices.getUserMedia({ audio: true })).getTracks().forEach((t) => t.stop()); } catch {}
+  await apiFetch("/api/mic-access", { method: "POST" }); // 先走系统的麦克风授权（Mac）
+  // App 里麦克风权限由主进程直接批准，不用像网页版那样先开一次麦克风才能看到设备名；
+  // Windows 上开麦克风要十几秒，开了反而让列表迟迟出不来
   const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput" && d.deviceId);
   const caps = window.APP_INFO?.caps ?? {};
   $("mic").innerHTML = devs.map((d) => `<option value="${d.deviceId}">${d.label || "麦克风"}</option>`).join("")

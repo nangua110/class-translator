@@ -13,7 +13,7 @@
     "vendor": "node scripts/vendor.mjs",
     "start": "npm run helpers && npm run vendor && electron .",
     "dist": "npm run helpers && npm run vendor && electron-builder --mac && node scripts/check-package.mjs",
-    "dist:win": "npm run vendor && electron-builder --win --x64 && electron-builder --win --arm64 && node scripts/check-package.mjs"
+    "dist:win": "npm run vendor && electron-builder --win --x64 -c.nsis.useZip=false && electron-builder --win --arm64 && node scripts/check-package.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
