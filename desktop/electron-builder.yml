@@ -40,6 +40,7 @@ dmg:
 win:
   target: nsis
   icon: assets/icon.png
+  executableName: ClassTranslator   # 主程序文件名用英文（开始菜单和桌面快捷方式仍显示「课堂同传」）；中文名在 zip 安装包里会变乱码
 nsis:
   oneClick: false                         # 显示安装向导，可以选安装位置
   perMachine: false                       # 装在当前用户下，不需要管理员权限

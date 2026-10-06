@@ -40,6 +40,13 @@ for (const res of resourceDirs) {
     try { buf = asar.extractFile(archive, rel); } catch { continue; } // 目录
     checkFile(rel, buf);
   }
+  if (res.includes(`${path.sep}win`)) {
+    // Windows 包里的文件名必须是英文：ARM64 安装程序用 zip，解压组件按系统编码读文件名，中文会变乱码（主程序找不到）
+    const appDir = path.dirname(res);
+    for (const name of fs.readdirSync(appDir)) {
+      if (/[^\x20-\x7e]/.test(name)) problems.push(`Windows 包里有非英文文件名：${name}（${appDir}）`);
+    }
+  }
   for (const need of MUST_HAVE) if (!listed.includes(need)) problems.push(`缺少必需文件：${need}（${res}）`);
   if (!fs.existsSync(path.join(res, MUST_UNPACKED))) problems.push(`缺少人声检测运行文件：${MUST_UNPACKED}（${res}）`);
   const ortFiles = listed.filter((f) => f.startsWith("node_modules/onnxruntime-web/dist/") && f.split("/").length === 4);
