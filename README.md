@@ -6,7 +6,7 @@
 
 <p align="center"><b>预览版 v0.1.0</b> · 免费 · Powered by 南瓜</p>
 
-<p align="center"><a href="../../releases/latest"><b>⬇️ 下载最新版</b></a></p>
+<p align="center"><a href="/nangua110/class-translator/releases/latest"><b>⬇️ 下载最新版</b></a></p>
 
 ![课堂同传主界面](docs/images/app.png)
 
