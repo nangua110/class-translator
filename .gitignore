@@ -1,0 +1,10 @@
+# 机密和个人数据：绝不提交
+.env
+records/
+# 环境和编译产物
+.venv/
+__pycache__/
+.DS_Store
+apple_asr/apple_asr
+apple_asr/syscap
+apple_asr/apple_translate
