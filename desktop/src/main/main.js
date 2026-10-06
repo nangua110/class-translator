@@ -34,8 +34,8 @@ function build() {
   const vad = { hasVoice: async (f32) => (await vadReady).hasVoice(f32) };
   const makeSession = (send) => new Session({
     send, llm, appleTr, records, caps,
-    makeAsr: (kind, speaker, offset, getTarget) => (kind === "cloud"
-      ? new CloudASR({ llm, vad, speaker, offset, getTarget })
+    makeAsr: (kind, speaker, offset) => (kind === "cloud"
+      ? new CloudASR({ llm, vad, speaker, offset })
       : new AppleASR(bins.asr, speaker, offset)),
   });
   const api = createApi({

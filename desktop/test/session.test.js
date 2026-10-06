@@ -160,29 +160,33 @@ test("文稿文件夹写不进去：只提示一次，不抛错，字幕照常�
   assert.equal(errors(sent).filter((m) => m.includes("文稿")).length, 1);
 });
 
-test("云端识别：带译文的确定句直接出字幕，不再另外翻译；时间加上引擎的起点", async () => {
-  const { s, sent, asrs } = setup();
-  s.configure({ asr: "cloud" });
+test("云端识别：字幕先出，翻译按所选方式另外做并带上前几句上文；时间加上引擎的起点", async () => {
+  const asked = [];
+  const { s, sent, asrs } = setup({ llm: { translate: async (t, ctx, target, provider) => { asked.push({ t, ctx, provider }); return `译:${t}`; } } });
+  s.configure({ asr: "cloud", translator: "claude" });
   s.audio(pcm(3));
   assert.equal(asrs[0].kind, "cloud");
-  assert.equal(asrs[0].offset, 0);
   asrs[0].offset = 3;
   asrs[0].emit("message", { type: "status", recognizing: true });
-  asrs[0].emit("message", { type: "final", source: "cloud", text: "Hello.", lang: "en", tr: "你好。", start: 1 });
+  asrs[0].emit("message", { type: "final", source: "cloud", text: "The second law.", lang: "en", start: 1 });
+  asrs[0].emit("message", { type: "final", source: "cloud", text: "Entropy never decreases.", lang: "en", start: 5 });
   await s.idle();
-  const line = sent.find((m) => m.type === "line");
-  assert.equal(line.tr, "你好。");
-  assert.equal(line.t, 4);
-  assert.equal(sent.filter((m) => m.type === "translation").length, 0);
+  const lines = sent.filter((m) => m.type === "line");
+  assert.equal(lines[0].tr, "", "字幕先出，译文随后到");
+  assert.equal(lines[0].t, 4);
+  assert.deepEqual(sent.filter((m) => m.type === "translation").map((m) => m.tr).sort(), ["译:Entropy never decreases.", "译:The second law."]);
+  const second = asked.find((a) => a.t === "Entropy never decreases.");
+  assert.deepEqual(second.ctx, ["The second law."], "翻译时带上前面的句子做上文");
+  assert.equal(second.provider, "claude", "用的是所选的翻译方式");
   assert.deepEqual(sent.find((m) => m.type === "status"), { type: "status", recognizing: true });
 });
 
-test("云端识别：别的语言丢掉；没带译文时照常后台翻译", async () => {
+test("云端识别：别的语言丢掉，所选语言照常后台翻译", async () => {
   const { s, sent, asrs } = setup();
   s.configure({ asr: "cloud" });
   s.audio(pcm(1));
-  asrs[0].emit("message", { type: "final", source: "cloud", text: "同学们好", lang: "zh", tr: "", start: 0 });
-  asrs[0].emit("message", { type: "final", source: "cloud", text: "Good morning.", lang: "en", tr: "", start: 2 });
+  asrs[0].emit("message", { type: "final", source: "cloud", text: "同学们好", lang: "zh", start: 0 });
+  asrs[0].emit("message", { type: "final", source: "cloud", text: "Good morning.", lang: "en", start: 2 });
   await s.idle();
   assert.deepEqual(sent.filter((m) => m.type === "line").map((m) => m.text), ["Good morning."]);
   assert.equal(sent.find((m) => m.type === "translation").tr, "译:Good morning.");

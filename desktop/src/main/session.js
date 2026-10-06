@@ -76,7 +76,7 @@ export class Session {
   }
 
   startAsr(kind) {
-    const asr = this.makeAsr(kind, this.cfg.speaker, this.samples / SR, () => this.cfg.target);
+    const asr = this.makeAsr(kind, this.cfg.speaker, this.samples / SR);
     asr.on("message", (m) => this.onAsr(asr, m));
     asr.on("exit", (code) => {
       if (this.asr === asr) this.asr = null;
@@ -94,7 +94,7 @@ export class Session {
       if (acceptPartial(m.text ?? "", asr.speaker)) this.send({ type: "partial", text: m.text });
     } else if (m.type === "final" && m.source === "cloud") {
       const r = acceptCloudFinal(m, asr.speaker);
-      if (r) this.addLine(r.text, r.lang, r.tr, asr.offset + r.start);
+      if (r) this.addLine(r.text, r.lang, "", asr.offset + r.start); // 翻译统一走 translateLine：带上文、按所选方式
     } else if (m.type === "final") {
       this.send({ type: "partial", text: "" });
       const r = acceptFinal(m, asr.speaker);

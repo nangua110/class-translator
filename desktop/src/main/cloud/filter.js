@@ -14,5 +14,5 @@ export function acceptCloudFinal(m, speaker) {
   const text = clean(m.text ?? "", lang);
   if (!text) return null;
   if (speaker !== "auto" && lang !== speaker) return null;
-  return { text, lang, tr: m.tr ?? "", start: m.start ?? 0 };
+  return { text, lang, start: m.start ?? 0 };
 }

@@ -36,20 +36,18 @@ export const REPORT_BODY_SYSTEM = (target) =>
   "5~8 条有序列表，每条「**要点标题**：一句话说明」。\n" +
   "篇幅与课程长度匹配：短课写短，不要编造课上没有的内容（补充说明除外）。不要输出这四部分以外的内容。";
 
-export const RECOGNIZE_SYSTEM = (speakerHint, target) =>
-  "你是课堂同声传译。听这段课堂录音：\n" +
+// 云端识别只负责听写；翻译另外按所选方式做（带前 3 句上文、会纠正识别错字）
+export const RECOGNIZE_SYSTEM = (speakerHint) =>
+  "你是课堂听写员。听这段课堂录音：\n" +
   "1. text：逐字转写原话，保持原语言（中文用简体），不要翻译、不要总结；" +
   `如果没有清晰的人声（只有噪音、静音、音乐、听不清的嘀咕），text 返回空字符串；听不清时宁可留空，绝不要猜或编造句子。${speakerHint}\n` +
-  "2. lang：原话的语言。\n" +
-  `3. translation：把 text 翻译成自然、准确的${target}；如果原话本来就是${target}或 text 为空，返回空字符串。` +
-  "专业术语可在译文后括号保留原词。";
+  "2. lang：原话的语言。";
 
 export const RECOGNIZE_SCHEMA = {
   type: "object",
   properties: {
     text: { type: "string" },
     lang: { type: "string", enum: ["en", "zh", "ja", "ko", "fr", "de", "es", "other"] },
-    translation: { type: "string" },
   },
-  required: ["text", "lang", "translation"],
+  required: ["text", "lang"],
 };

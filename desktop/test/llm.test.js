@@ -90,29 +90,30 @@ test("Claude：取文字、拒绝时给提示、Haiku 不带 effort", async () =
   assert.equal(await askClaude(client, "x", { system: "s", prompt: "p", effort: "low", maxTokens: 10 }), "（模型拒绝处理该段）");
 });
 
-test("云端识别：音频以 WAV 附件发送，要求按 JSON 返回转写、语言、译文", async () => {
-  const g = fakeGemini(() => '{"text":" Hello there. ","lang":"en","translation":" 你好。 "}');
+test("云端识别：音频以 WAV 附件发送，只要求返回转写和语言（翻译另外带上文做）", async () => {
+  const g = fakeGemini(() => '{"text":" Hello there. ","lang":"en"}');
   const llm = new LLM(settings({ gemini: "k" }), { gemini: () => g, claude: () => ({}) });
   const wav = Buffer.from("RIFF....WAVEfmt ");
-  assert.deepEqual(await llm.recognize(wav, "英语", "简体中文"), { text: "Hello there.", lang: "en", tr: "你好。" });
+  assert.deepEqual(await llm.recognize(wav, "英语"), { text: "Hello there.", lang: "en" });
   const req = g.calls[0];
   const [audio, prompt] = req.contents[0].parts;
   assert.equal(audio.inlineData.mimeType, "audio/wav");
   assert.equal(Buffer.from(audio.inlineData.data, "base64").toString(), wav.toString());
   assert.equal(prompt.text, "请处理这段录音。");
   assert.equal(req.config.responseMimeType, "application/json");
-  assert.deepEqual(req.config.responseJsonSchema.required, ["text", "lang", "translation"]);
+  assert.deepEqual(req.config.responseJsonSchema.required, ["text", "lang"]);
+  assert.doesNotMatch(req.config.systemInstruction, /translation/); // 不再要求模型顺带翻译
   assert.match(req.config.systemInstruction, /说话人主要讲英语/);
   assert.match(req.config.systemInstruction, /绝不要猜或编造句子/);
 });
 
 test("云端识别：自动模式不加说话人提示；没 key 抛 NoKey", async () => {
-  const g = fakeGemini(() => '{"text":"","lang":"other","translation":""}');
+  const g = fakeGemini(() => '{"text":"","lang":"other"}');
   const llm = new LLM(settings({ gemini: "k" }), { gemini: () => g, claude: () => ({}) });
-  await llm.recognize(Buffer.from("x"), null, "简体中文");
+  await llm.recognize(Buffer.from("x"), null);
   assert.doesNotMatch(g.calls[0].config.systemInstruction, /说话人主要讲/);
   const none = new LLM(settings(), { gemini: () => fakeGemini(), claude: () => ({}) });
-  await assert.rejects(none.recognize(Buffer.from("x"), null, "简体中文"), NoKey);
+  await assert.rejects(none.recognize(Buffer.from("x"), null), NoKey);
 });
 
 test("模型都因为超时 / 服务器忙在冷却：报的是「网络慢」不是「额度用完」", async () => {

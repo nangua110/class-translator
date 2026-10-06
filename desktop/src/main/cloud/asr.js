@@ -3,17 +3,17 @@ import { Segmenter } from "./segmenter.js";
 import { toWav } from "./wav.js";
 import { friendly } from "../text.js";
 import { AllModelsBusy, NoKey } from "../llm/errors.js";
-import { SPEAKER_LANGS, TARGET_LANGS } from "../langs.js";
+import { SPEAKER_LANGS } from "../langs.js";
 
 export const QUOTA_PAUSE_MS = 600_000; // 额度用完后 10 分钟内不再请求
 export const MAX_BACKLOG = 3;          // 识别跟不上时最多积压几句，再多就跳过最旧的
 const NET_WARN_MS = 60_000;            // 网络慢的提示最多一分钟一次
 
-/** 云端识别（旧 Mac、Windows 用）：按音量断句 → 人声检测 → Gemini 一次拿回转写和译文。接口和 AppleASR 一样 */
+/** 云端识别（旧 Mac、Windows 用）：按音量断句 → 人声检测 → Gemini 听写。翻译由 Session 另外做（带上文）。接口和 AppleASR 一样 */
 export class CloudASR extends EventEmitter {
-  constructor({ llm, vad, speaker, offset, getTarget, now = Date.now }) {
+  constructor({ llm, vad, speaker, offset, now = Date.now }) {
     super();
-    Object.assign(this, { llm, vad, speaker, offset, getTarget, now });
+    Object.assign(this, { llm, vad, speaker, offset, now });
     this.kind = "cloud";
     this.segmenter = new Segmenter();
     this.items = [];            // 等待识别的句子（按时间顺序）
@@ -73,9 +73,9 @@ export class CloudASR extends EventEmitter {
     this.emit("message", { type: "status", recognizing: true });
     try {
       const speakerLabel = this.speaker === "auto" ? null : SPEAKER_LANGS[this.speaker];
-      const r = await this.llm.recognize(toWav(seg.audio), speakerLabel, TARGET_LANGS[this.getTarget()]);
+      const r = await this.llm.recognize(toWav(seg.audio), speakerLabel);
       this.noted.delete("nokey");
-      if (!this.dead) this.emit("message", { type: "final", source: "cloud", text: r.text, lang: r.lang, tr: r.tr, start: seg.start });
+      if (!this.dead) this.emit("message", { type: "final", source: "cloud", text: r.text, lang: r.lang, start: seg.start });
     } catch (e) {
       if (e instanceof NoKey) {
         this.#note("nokey", `${e.message}：请点右上角「AI 模型与 API」填写，填好后马上生效`);

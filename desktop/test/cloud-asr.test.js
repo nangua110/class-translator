@@ -14,9 +14,9 @@ const sentence = () => Buffer.concat([pcm(1.2, 0.3), pcm(1, 0)]); // 一句话 +
 function setup({ recognize, voice = true, now } = {}) {
   const calls = [], msgs = [];
   const asr = new CloudASR({
-    llm: { recognize: async (wav, sp, tg) => { calls.push([wav, sp, tg]); return recognize ? recognize(calls.length) : { text: `第${calls.length}句`, lang: "zh", tr: "" }; } },
+    llm: { recognize: async (wav, sp) => { calls.push([wav, sp]); return recognize ? recognize(calls.length) : { text: `第${calls.length}句`, lang: "zh" }; } },
     vad: { hasVoice: async () => voice },
-    speaker: "en", offset: 5, getTarget: () => "zh", now,
+    speaker: "en", offset: 5, now,
   });
   asr.on("message", (m) => msgs.push(m));
   asr.start();
@@ -25,15 +25,15 @@ function setup({ recognize, voice = true, now } = {}) {
 const finals = (msgs) => msgs.filter((m) => m.type === "final");
 const errors = (msgs) => msgs.filter((m) => m.type === "error").map((m) => m.msg);
 
-test("有人声的一句：发 WAV 去识别，带上说话人和目标语言，返回结果和开始时间", async () => {
-  const { asr, calls, msgs } = setup({ recognize: () => ({ text: "Hello.", lang: "en", tr: "你好。" }) });
+test("有人声的一句：发 WAV 去识别，带上说话人语言，返回转写和开始时间（不带译文）", async () => {
+  const { asr, calls, msgs } = setup({ recognize: () => ({ text: "Hello.", lang: "en" }) });
   asr.feed(sentence());
   await asr.close();
   assert.equal(calls.length, 1);
   assert.equal(calls[0][0].toString("ascii", 0, 4), "RIFF");
-  assert.deepEqual(calls[0].slice(1), ["英语", "简体中文"]);
+  assert.deepEqual(calls[0].slice(1), ["英语"]);
   const [f] = finals(msgs);
-  assert.deepEqual({ ...f, start: Math.round(f.start * 10) / 10 }, { type: "final", source: "cloud", text: "Hello.", lang: "en", tr: "你好。", start: 0 });
+  assert.deepEqual({ ...f, start: Math.round(f.start * 10) / 10 }, { type: "final", source: "cloud", text: "Hello.", lang: "en", start: 0 });
   assert.deepEqual(msgs.filter((m) => m.type === "status").map((m) => m.recognizing), [true, false]);
 });
 
@@ -93,7 +93,7 @@ test("kill：丢掉还没处理的段，exit -1；close 后 exit 0", async () =>
 
 test("acceptCloudFinal：只留所选语言；自动模式中英都留；奇怪的语言代码按文字归类", () => {
   assert.equal(acceptCloudFinal({ text: "同学们好", lang: "zh", tr: "", start: 1 }, "en"), null);
-  assert.deepEqual(acceptCloudFinal({ text: "Hi there ", lang: "en", tr: "你好", start: 1 }, "en"), { text: "Hi there", lang: "en", tr: "你好", start: 1 });
+  assert.deepEqual(acceptCloudFinal({ text: "Hi there ", lang: "en", start: 1 }, "en"), { text: "Hi there", lang: "en", start: 1 });
   assert.equal(acceptCloudFinal({ text: "同学们好", lang: "zh", tr: "", start: 0 }, "auto").lang, "zh");
   assert.equal(acceptCloudFinal({ text: "同學們好", lang: "other", tr: "", start: 0 }, "auto").text, "同学们好");
   assert.equal(acceptCloudFinal({ text: "Hello", lang: "other", tr: "", start: 0 }, "auto").lang, "en");
@@ -128,7 +128,7 @@ test("人声检测出错：提示一次，照常识别", async () => {
   const asr = new CloudASR({
     llm: { recognize: async () => { calls.push(1); return { text: "Hi.", lang: "en", tr: "" }; } },
     vad: { hasVoice: async () => { throw new Error("wasm 加载失败"); } },
-    speaker: "en", offset: 0, getTarget: () => "zh",
+    speaker: "en", offset: 0,
   });
   asr.on("message", (m) => msgs.push(m));
   asr.feed(sentence()); asr.feed(sentence());
