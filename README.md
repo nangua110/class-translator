@@ -6,6 +6,8 @@
 
 <p align="center"><b>预览版 v0.1.0</b> · 免费 · Powered by 南瓜</p>
 
+<p align="center"><a href="/nangua110/class-translator/releases/latest"><b>⬇️ 下载最新版</b></a></p>
+
 ![课堂同传主界面](docs/images/app.png)
 
 ## 能做什么
@@ -29,7 +31,7 @@
 
 ## 下载安装
 
-1. 点本页右侧 **Releases** 下的 **「课堂同传 v0.1.0 预览版」**，在打开页面最下面的 **Assets** 里下载安装包：
+1. 点本页最上面的 **「⬇️ 下载最新版」**（或者本页右侧 Releases 下的「课堂同传 v0.1.0 预览版」），在打开页面最下面的 **Assets** 里下载安装包：
    - 苹果芯片的 Mac（M1、M2、M3、M4……）：下载 **「课堂同传 0.1.0（苹果芯片 M1–M4）」**
    - Intel 芯片的 Mac：下载 **「课堂同传 0.1.0（Intel 芯片）」**
 
