@@ -25,3 +25,5 @@ mac:
 afterSign: scripts/adhoc-sign.cjs
 dmg:
   title: 课堂同传
+  # 文件名用英文：GitHub 发布页会把中文文件名去掉
+  artifactName: ClassTranslator-${version}-${arch}.${ext}
