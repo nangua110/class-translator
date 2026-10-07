@@ -6,6 +6,7 @@ import path from "node:path";
 import { createApi } from "../src/main/api.js";
 import { Records } from "../src/main/store/records.js";
 import { Settings } from "../src/main/store/settings.js";
+import { AudioRecorder } from "../src/main/store/audio.js";
 
 const fakeCrypto = { isEncryptionAvailable: () => true, encryptString: (s) => Buffer.from("E" + s), decryptString: (b) => b.toString().slice(1) };
 const NAME = "2026-10-07_09-00-00.md";
@@ -149,4 +150,30 @@ test("取录音片段：有录音的课能取，没有的 / 名字不合法的�
   assert.equal(r.wav.length, 44 + 3 * 32000);
   assert.deepEqual(await api("/api/audio?record=../../secret.md&t=0", "GET"), { ok: false });
   assert.deepEqual(await api("/api/audio?record=2026-10-08_09-00-00.md&t=0", "GET"), { ok: false });
+});
+
+test("录音列表：时长、大小、还有几天清理；删除只删录音，正在录的不让删", async () => {
+  const { api, records, settings } = setup();
+  records.save(NAME, "", lines3);
+  const wav = records.audioFile(NAME);
+  fs.writeFileSync(wav, Buffer.concat([Buffer.alloc(44), Buffer.alloc(32000 * 5)]));
+  fs.writeFileSync(path.join(records.dir, "别的歌.wav"), "x"); // 不是课堂同传的录音：不列出
+  const old = Date.now() - 2.5 * 86400_000;
+  fs.utimesSync(wav, old / 1000, old / 1000);
+  let list = await api("/api/audios", "GET");
+  assert.equal(list.length, 1);
+  assert.deepEqual({ ...list[0], mtime: 0 }, { record: NAME, stem: NAME.replace(/\.md$/, ""), seconds: 5, bytes: 44 + 160000, days_left: 5, title: "", mtime: 0 });
+  settings.setPref("audioKeepDays", 0);
+  assert.equal((await api("/api/audios", "GET"))[0].days_left, null);
+
+  assert.deepEqual(await api("/api/audio-delete", "POST", { record: "../../secret.md" }), { ok: false, msg: "找不到这段录音" });
+  const rec = new AudioRecorder(wav);
+  rec.write(Buffer.alloc(320));
+  assert.deepEqual(await api("/api/audio-delete", "POST", { record: NAME }), { ok: false, msg: "这节课还在录，结束录制后才能删除录音" });
+  rec.close();
+  assert.deepEqual(await api("/api/audio-delete", "POST", { record: NAME }), { ok: true });
+  assert.equal(fs.existsSync(wav), false);
+  assert.equal(records.exists(NAME), true); // 文字记录还在
+  assert.equal(fs.existsSync(path.join(records.dir, "别的歌.wav")), true);
+  assert.deepEqual(await api("/api/audios", "GET"), []);
 });

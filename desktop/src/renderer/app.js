@@ -289,6 +289,49 @@ function linkTimes(root, record) {
     node.replaceWith(frag);
   }
 }
+// ---------- 查看录音：列出存在这台电脑上的录音，可以播放、删除 ----------
+const fmtSize = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(b >= 10485760 ? 0 : 1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+const fmtDur = (s) => (s >= 60 ? `${Math.round(s / 60)} 分钟` : `${Math.round(s)} 秒`);
+async function openAudios() {
+  let list;
+  try { list = await (await apiFetch("/api/audios")).json(); } catch { return toast("连不上本地服务，打不开"); }
+  const box = $("audioList");
+  box.textContent = "";
+  for (const a of list) {
+    const [, mo, d, h, mi] = a.stem.match(/^\d{4}-(\d\d)-(\d\d)_(\d\d)-(\d\d)/);
+    const item = document.createElement("div"); item.className = "item";
+    const info = document.createElement("div"); info.className = "info";
+    const name = document.createElement("div"); name.className = "name";
+    name.textContent = `${mo}-${d} ${h}:${mi}${a.title ? ` · ${a.title}` : ""}`;
+    const meta = document.createElement("div"); meta.className = "meta";
+    meta.textContent = [fmtDur(a.seconds), fmtSize(a.bytes),
+      a.days_left === null ? "不自动清理" : a.days_left > 0 ? `${a.days_left} 天后自动清理` : "即将自动清理"].join(" · ");
+    info.append(name, meta);
+    const play = document.createElement("button"); play.type = "button"; play.textContent = "播放";
+    play.onclick = () => { $("audios").close(); playAt(a.record, 0); };
+    const del = document.createElement("button"); del.type = "button"; del.className = "del"; del.textContent = "删除";
+    del.onclick = async () => {
+      if (!confirm("删除这段录音？文字记录和课后精讲会保留。")) return;
+      let r;
+      try { r = await (await apiFetch("/api/audio-delete", { method: "POST", body: JSON.stringify({ record: a.record }) })).json(); }
+      catch { r = { ok: false }; }
+      if (!r.ok) return toast(r.msg || "删除失败");
+      if (playing?.record === a.record) closePlayer();
+      const rec = records.find((x) => x.name === a.record);
+      if (rec) rec.has_audio = false;
+      openAudios();
+    };
+    item.append(info, play, del);
+    box.append(item);
+  }
+  $("audioSum").textContent = list.length
+    ? `共 ${list.length} 段，占 ${fmtSize(list.reduce((n, a) => n + a.bytes, 0))}。录音只存在这台电脑上。`
+    : "还没有保存的录音。勾选「保存录音」后，之后录的课会出现在这里。";
+  if (!$("audios").open) $("audios").showModal();
+}
+$("audiosBtn").onclick = openAudios;
+$("audiosClose").onclick = () => $("audios").close();
+$("audiosFolder").onclick = () => apiFetch("/api/open-records-folder", { method: "POST" });
 async function savePrefs(body) {
   try { await apiFetch("/api/prefs", { method: "POST", body: JSON.stringify(body) }); } catch { toast("设置没保存上"); }
 }

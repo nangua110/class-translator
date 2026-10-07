@@ -2,7 +2,8 @@ import { CLAUDE_MODELS, GEMINI_MODELS, TARGET_LANGS, TRANSLATORS } from "./langs
 import { friendly, simplify } from "./text.js";
 import { isAuthError } from "./llm/errors.js";
 import { reportMarkdown } from "./store/records.js";
-import { readAudioChunk } from "./store/audio.js";
+import fs from "node:fs";
+import { isRecordingTo, listAudio, readAudioChunk } from "./store/audio.js";
 
 const LABEL = { gemini: "Gemini", claude: "Claude" };
 const KEEP_DAYS = [0, 3, 7, 30];  // 录音保留天数的可选项；0 = 一直保留
@@ -84,6 +85,20 @@ export function createApi({ settings, llm, appleTr, records, caps, version, open
         const name = q.get("record");
         const chunk = records.hasAudio(name) ? readAudioChunk(records.audioFile(name), Number(q.get("t")) || 0, AUDIO_CHUNK_SEC) : null;
         return chunk ? { ok: true, ...chunk } : { ok: false };
+      }
+      case "GET /api/audios": { // 「查看录音」里的列表
+        const keep = audioPrefs().audioKeepDays;
+        return listAudio(records.dir).map((a) => ({
+          record: `${a.stem}.md`, ...a, title: records.readReport(`${a.stem}.md`)?.title ?? "",
+          days_left: keep > 0 ? Math.max(0, Math.ceil(keep - (Date.now() - a.mtime) / 86400_000)) : null,
+        }));
+      }
+      case "POST /api/audio-delete": { // 只删录音，文字记录和课后精讲不动
+        const name = body?.record;
+        if (!records.hasAudio(name)) return { ok: false, msg: "找不到这段录音" };
+        if (isRecordingTo(records.audioFile(name))) return { ok: false, msg: "这节课还在录，结束录制后才能删除录音" };
+        try { fs.unlinkSync(records.audioFile(name)); } catch (e) { return { ok: false, msg: `删除失败：${friendly(e)}` }; }
+        return { ok: true };
       }
       case "POST /api/privacy-accepted":
         settings.setPref("privacyAccepted", true);

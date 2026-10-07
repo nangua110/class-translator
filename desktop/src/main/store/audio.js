@@ -6,6 +6,9 @@ const HEADER = 44;
 // 只认课堂同传自己起的录音文件名，自动清理时别的 wav 一概不碰
 export const AUDIO_NAME_RE = /^\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d\.wav$/;
 
+const recording = new Set(); // 正在写的录音文件
+export const isRecordingTo = (file) => recording.has(file);
+
 export function wavHeader(dataBytes) {
   const b = Buffer.alloc(HEADER);
   b.write("RIFF", 0, "ascii"); b.writeUInt32LE(36 + dataBytes, 4); b.write("WAVE", 8, "ascii");
@@ -27,6 +30,7 @@ export class AudioRecorder {
     if (this.fd === null) {
       fs.mkdirSync(path.dirname(this.file), { recursive: true });
       this.fd = fs.openSync(this.file, "w");
+      recording.add(this.file);
       fs.writeSync(this.fd, wavHeader(0), 0, HEADER, 0);
     }
     fs.writeSync(this.fd, buf, 0, buf.length, HEADER + this.bytes);
@@ -40,7 +44,7 @@ export class AudioRecorder {
   close() {
     if (this.fd === null) return;
     const fd = this.fd;
-    try { this.#header(); } finally { this.fd = null; fs.closeSync(fd); }
+    try { this.#header(); } finally { this.fd = null; recording.delete(this.file); fs.closeSync(fd); }
   }
 }
 
@@ -74,4 +78,16 @@ export function cleanOldAudio(dir, keepDays, now = Date.now()) {
     } catch {} // 正在被别的程序占用等：下次再清
   }
   return n;
+}
+
+/** 文件夹里所有课堂录音：新的在前 */
+export function listAudio(dir) {
+  let names;
+  try { names = fs.readdirSync(dir); } catch { return []; }
+  return names.filter((n) => AUDIO_NAME_RE.test(n)).sort().reverse().flatMap((name) => {
+    try {
+      const st = fs.statSync(path.join(dir, name));
+      return [{ stem: name.replace(/\.wav$/, ""), bytes: st.size, seconds: Math.max(0, st.size - HEADER) / BYTES_PER_SEC, mtime: st.mtimeMs }];
+    } catch { return []; }
+  });
 }

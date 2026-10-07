@@ -112,6 +112,14 @@
   dialog .hint { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
   dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
   dialog [hidden] { display: none !important; }
+  .audio-list { max-height: 50vh; overflow-y: auto; }
+  .audio-list .item { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .audio-list .item:last-child { border-bottom: none; }
+  .audio-list .info { flex: 1; min-width: 0; }
+  .audio-list .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .audio-list .meta { font-size: 13px; color: var(--muted); }
+  .audio-list button { padding: 5px 12px; font-size: 14px; }
+  .audio-list button.del { color: var(--red); }
   table.privacy { border-collapse: collapse; width: 100%; font-size: 14px; }
   table.privacy td { border-bottom: 1px solid var(--line); padding: 8px 6px; vertical-align: top; }
   table.privacy td:first-child { color: var(--muted); width: 44%; }  /* 自带 display 的元素也要能隐藏 */
@@ -140,6 +148,7 @@
   <label>麦克风 <select id="mic"></select></label>
   <label class="check" title="把这节课的原声存在这台电脑上，之后点字幕的时间就能回听"><input type="checkbox" id="saveAudio"> 保存录音</label>
   <label id="keepWrap" hidden>自动清理 <select id="keepDays"></select></label>
+  <button id="audiosBtn" title="查看、播放或删除保存在这台电脑上的录音">查看录音</button>
   <button id="settingsBtn">AI 模型与 API</button>
 </header>
 <main>
@@ -191,6 +200,15 @@
     <p class="hint">课堂录音前，请先确认学校和老师的规定。</p>
   </section>
   <div class="actions"><button class="primary" id="privacyOk" type="button">我知道了</button></div>
+</dialog>
+<dialog id="audios">
+  <h3>已保存的录音</h3>
+  <section>
+    <div class="audio-list" id="audioList"></div>
+    <p class="hint" id="audioSum"></p>
+  </section>
+  <div class="actions"><button id="audiosFolder" type="button">打开录音文件夹</button>
+    <button class="primary" id="audiosClose" type="button">关闭</button></div>
 </dialog>
 <dialog id="settings">
   <h3>AI 模型与 API</h3>
