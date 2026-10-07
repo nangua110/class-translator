@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { app, BrowserWindow, desktopCapturer, ipcMain, safeStorage, session, shell, systemPreferences } from "electron";
+import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, safeStorage, session, shell, systemPreferences } from "electron";
 import { SR } from "./langs.js";
 import { Settings } from "./store/settings.js";
 import { Records } from "./store/records.js";
@@ -78,6 +78,8 @@ async function runSmoke({ makeSession }) {
 async function main() {
   await app.whenReady();
   const deps = build();
+  // Windows 上窗口顶部默认有一排英文菜单（File / Edit / View / Window），用不上，去掉；Mac 的菜单在屏幕顶部，保留（复制粘贴快捷键靠它）
+  if (process.platform !== "darwin") Menu.setApplicationMenu(null);
   if (!app.isPackaged && process.platform === "darwin") app.dock.setIcon(path.join(here, "../../assets/icon.png")); // 开发时程序坞也用新图标
   session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(perm === "media"));
   session.defaultSession.setPermissionCheckHandler((_wc, perm) => perm === "media");
@@ -97,7 +99,7 @@ async function main() {
     mainWindow.webContents.once("did-finish-load", async () => {
       await new Promise((r) => setTimeout(r, Number(process.env.CT_SMOKE_DELAY ?? 1500)));
       const state = await mainWindow.webContents.executeJavaScript(
-        `JSON.stringify({ powered: document.querySelector(".powered")?.textContent.trim(), inFoot: !!document.querySelector(".card-foot .powered"), standalone: !!document.querySelector("footer.powered"), asr: [...document.querySelectorAll("#asr option")].map(o => o.textContent), speaker: document.querySelector("#speaker").value, speakers: [...document.querySelectorAll("#speaker option")].map(o => o.value), mics: [...document.querySelectorAll("#mic option")].map(o => o.textContent), privacyApple: !document.querySelector(".apple-only")?.hidden })`);
+        `JSON.stringify({ menu: ${JSON.stringify(!!Menu.getApplicationMenu())}, powered: document.querySelector(".powered")?.textContent.trim(), inFoot: !!document.querySelector(".card-foot .powered"), standalone: !!document.querySelector("footer.powered"), asr: [...document.querySelectorAll("#asr option")].map(o => o.textContent), speaker: document.querySelector("#speaker").value, speakers: [...document.querySelectorAll("#speaker option")].map(o => o.value), mics: [...document.querySelectorAll("#mic option")].map(o => o.textContent), privacyApple: !document.querySelector(".apple-only")?.hidden })`);
       if (process.env.CT_SMOKE_SHOT) fs.writeFileSync(process.env.CT_SMOKE_SHOT, (await mainWindow.webContents.capturePage()).toPNG());
       console.log("window-loaded " + state);
       app.quit();
