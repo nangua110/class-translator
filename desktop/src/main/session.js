@@ -3,6 +3,7 @@ import { simplify, friendly } from "./text.js";
 import { acceptFinal, acceptPartial } from "./apple/filter.js";
 import { acceptCloudFinal } from "./cloud/filter.js";
 import { AllModelsBusy, NoKey } from "./llm/errors.js";
+import { acceptLocalFinal } from "./local/filter.js";
 
 const DEFAULTS = { speaker: "en", target: "zh", asr: "apple", translator: "gemini" };
 const MAX_PARALLEL_TRANSLATIONS = 6;
@@ -25,8 +26,8 @@ export class Session {
     this.waiters = [];
     this.samples = 0;         // 已收到的音频样本数，用来算时间
     this.asr = null;
-    this.asrCrashes = 0;
-    this.appleFailed = "";    // 连续崩溃的说话人语言，不再重启
+    this.crashes = new Map(); // 每种识别方式出错的次数
+    this.failed = new Set();  // 连续出错的「识别方式:说话人语言」，不再重启
     this.paused = false;
     this.fallbackNoted = false;
     this.warned = new Set();
@@ -54,9 +55,10 @@ export class Session {
     this.send({ type: "error", msg });
   }
 
-  /** 这节课用哪种识别：苹果（新 Mac）或云端（Gemini）；都用不了返回 null */
+  /** 这节课用哪种识别：苹果（新 Mac）、本地实时（英语）或云端（Gemini）；都用不了返回 null */
   asrKind() {
     if (this.cfg.asr === "apple" && this.caps.appleAsr) return "apple";
+    if (this.cfg.asr === "local" && this.caps.localAsr) return "local";
     if (this.cfg.asr === "cloud" && this.caps.cloudAsr) return "cloud";
     return null;
   }
@@ -65,10 +67,13 @@ export class Session {
     if (this.paused) return;
     const kind = this.asrKind();
     if (!kind) {
-      return this.warnOnce("no-asr", "这台电脑用不了苹果自带识别（需要 macOS 26 或更新），请在「识别方式」里选「云端（Gemini）」。");
+      return this.warnOnce("no-asr", "这台电脑用不了苹果自带识别（需要 macOS 26 或更新），请在「识别方式」里选「本地实时」或「云端（Gemini）」。");
     }
-    if (kind === "apple" && this.appleFailed === this.cfg.speaker) {
-      return this.warnOnce("crash", "苹果识别连续出错，已停止识别。请结束录制后重新开始，或者在「识别方式」里改用「云端（Gemini）」。");
+    if (kind === "local" && this.cfg.speaker !== "en") {
+      return this.warnOnce("local-lang", "本地实时识别目前只支持英语，请把「识别方式」改成「云端（Gemini）」。");
+    }
+    if (this.failed.has(`${kind}:${this.cfg.speaker}`)) {
+      return this.warnOnce(`crash-${kind}`, "识别程序连续出错，已停止识别。请结束录制后重新开始，或者在「识别方式」里换一种。");
     }
     if (!this.asr) this.startAsr(kind);
     this.asr.feed(buf);
@@ -81,8 +86,9 @@ export class Session {
     asr.on("exit", (code) => {
       if (this.asr === asr) this.asr = null;
       if (code !== 0 && code !== -1) {      // -1 是我们自己关掉的
-        this.asrCrashes += 1;
-        if (this.asrCrashes >= 2) this.appleFailed = asr.speaker; // 下一段音频时自动重启一次，再崩就停
+        this.crashes.set(asr.kind, (this.crashes.get(asr.kind) ?? 0) + 1);
+        // 下一段音频时自动重启一次，再出错就停
+        if (this.crashes.get(asr.kind) >= 2) this.failed.add(`${asr.kind}:${asr.speaker}`);
       }
     });
     asr.start();
@@ -92,6 +98,9 @@ export class Session {
   onAsr(asr, m) {
     if (m.type === "partial") {
       if (acceptPartial(m.text ?? "", asr.speaker)) this.send({ type: "partial", text: m.text });
+    } else if (m.type === "final" && m.source === "local") {
+      const r = acceptLocalFinal(m, asr.speaker);
+      if (r) this.addLine(r.text, r.lang, "", asr.offset + r.start);
     } else if (m.type === "final" && m.source === "cloud") {
       const r = acceptCloudFinal(m, asr.speaker);
       if (r) this.addLine(r.text, r.lang, "", asr.offset + r.start); // 翻译统一走 translateLine：带上文、按所选方式
@@ -104,7 +113,7 @@ export class Session {
     } else if (m.type === "downloading") {
       this.send({ type: "error", msg: "第一次用这种语言，正在下载苹果语音模型，稍等片刻…" });
     } else if (m.type === "error") {
-      this.send({ type: "error", msg: asr.kind === "cloud" ? m.msg : `苹果识别出错：${String(m.msg ?? "").slice(0, 60)}` });
+      this.send({ type: "error", msg: asr.kind === "apple" ? `苹果识别出错：${String(m.msg ?? "").slice(0, 60)}` : m.msg });
     }
   }
 

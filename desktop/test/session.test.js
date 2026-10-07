@@ -12,7 +12,7 @@ class FakeAsr extends EventEmitter {
   kill() { this.killed = true; }
 }
 
-function setup({ llm = {}, appleTr = {}, caps = { appleAsr: true, cloudAsr: true } } = {}) {
+function setup({ llm = {}, appleTr = {}, caps = { appleAsr: true, cloudAsr: true, localAsr: true } } = {}) {
   const sent = [], asrs = [], saved = [];
   const s = new Session({
     send: (m) => sent.push(m),
@@ -207,4 +207,60 @@ test("没有苹果识别的电脑选云端：正常工作，不提示 macOS 26",
   s.audio(pcm(1));
   assert.equal(asrs.length, 1);
   assert.equal(errors(sent).length, 0);
+});
+
+test("本地实时：草稿照发，定稿直接出字幕并按所选方式带上文翻译", async () => {
+  const asked = [];
+  const { s, sent, asrs } = setup({ llm: { translate: async (t, ctx, _target, provider) => { asked.push({ t, ctx, provider }); return `译:${t}`; } } });
+  s.configure({ asr: "local" });
+  s.audio(pcm(2));
+  assert.equal(asrs[0].kind, "local");
+  asrs[0].offset = 2;
+  asrs[0].emit("message", { type: "partial", text: "The second" });
+  asrs[0].emit("message", { type: "final", source: "local", text: "The second law.", conf: 0.75, start: 1 });
+  asrs[0].emit("message", { type: "final", source: "local", text: "Entropy never decreases.", conf: 0.7, start: 4 });
+  await s.idle();
+  assert.deepEqual(sent.find((m) => m.type === "partial"), { type: "partial", text: "The second" });
+  assert.deepEqual(sent.filter((m) => m.type === "line").map((m) => [m.text, m.t]), [["The second law.", 3], ["Entropy never decreases.", 6]]);
+  assert.deepEqual(asked.find((a) => a.t === "Entropy never decreases.").ctx, ["The second law."]);
+});
+
+test("本地实时：把握低的句子（旁边有人说中文）不出字幕", async () => {
+  const { s, sent, asrs } = setup();
+  s.configure({ asr: "local" });
+  s.audio(pcm(1));
+  asrs[0].emit("message", { type: "final", source: "local", text: "Tong Yeminghau, Zing yang womanianli.", conf: 0.3, start: 0 });
+  await s.idle();
+  assert.equal(sent.filter((m) => m.type === "line").length, 0);
+});
+
+test("本地实时只支持英语：说话人语言选了别的，只提示一次，不启动识别", () => {
+  const { s, sent, asrs } = setup();
+  s.configure({ asr: "local", speaker: "zh" });
+  s.audio(pcm(1)); s.audio(pcm(1));
+  assert.equal(asrs.length, 0);
+  assert.equal(errors(sent).length, 1);
+  assert.match(errors(sent)[0], /只支持英语/);
+});
+
+test("本地实时线程出错：自动重启一次，再出错就停止并提示一次", () => {
+  const { s, sent, asrs } = setup();
+  s.configure({ asr: "local" });
+  s.audio(pcm(1)); asrs[0].emit("exit", 1);
+  s.audio(pcm(1));
+  assert.equal(asrs.length, 2);
+  asrs[1].emit("exit", 1);
+  s.audio(pcm(1)); s.audio(pcm(1));
+  assert.equal(asrs.length, 2);
+  assert.equal(errors(sent).filter((m) => m.includes("连续出错")).length, 1);
+});
+
+test("一种识别方式出错停掉后，换另一种还能用", () => {
+  const { s, asrs } = setup();
+  s.configure({ asr: "local" });
+  s.audio(pcm(1)); asrs[0].emit("exit", 1);
+  s.audio(pcm(1)); asrs[1].emit("exit", 1);
+  s.configure({ asr: "cloud" });
+  s.audio(pcm(1));
+  assert.equal(asrs[2].kind, "cloud");
 });
