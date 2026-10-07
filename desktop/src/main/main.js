@@ -16,6 +16,7 @@ import { Session } from "./session.js";
 import { savePdf } from "./pdf.js";
 import { VoiceDetector } from "./cloud/vad.js";
 import { CloudASR } from "./cloud/asr.js";
+import { LocalASR } from "./local/asr.js";
 
 const here = import.meta.dirname;
 app.setName("课堂同传");
@@ -23,7 +24,10 @@ let mainWindow = null;
 
 function build() {
   const bins = helperPaths({ isPackaged: app.isPackaged, resourcesPath: process.resourcesPath, devDir: path.join(here, "../../build/bin") });
-  const caps = capabilities({ platform: process.platform, version: process.getSystemVersion(), has: (p) => fs.existsSync(p), bins });
+  // 本地实时识别：模型是资源文件；线程脚本和 sherpa-onnx 打包时放在 asar 外面（线程和 WASM 都要按真实文件路径加载）
+  const modelDir = app.isPackaged ? path.join(process.resourcesPath, "models", "kroko-en") : path.join(here, "../../models/kroko-en");
+  const localWorker = path.join(here, "local/worker.cjs").replace("app.asar", "app.asar.unpacked");
+  const caps = capabilities({ platform: process.platform, version: process.getSystemVersion(), has: (p) => fs.existsSync(p), bins, localModel: path.join(modelDir, "encoder.onnx") });
   const settings = new Settings(path.join(app.getPath("userData"), "settings.json"), safeStorage);
   const records = new Records(process.env.CT_RECORDS_DIR ?? path.join(app.getPath("documents"), "课堂同传"));
   const llm = new LLM(settings);
@@ -34,9 +38,11 @@ function build() {
   const vad = { hasVoice: async (f32) => (await vadReady).hasVoice(f32) };
   const makeSession = (send) => new Session({
     send, llm, appleTr, records, caps,
-    makeAsr: (kind, speaker, offset) => (kind === "cloud"
-      ? new CloudASR({ llm, vad, speaker, offset })
-      : new AppleASR(bins.asr, speaker, offset)),
+    makeAsr: (kind, speaker, offset) => {
+      if (kind === "cloud") return new CloudASR({ llm, vad, speaker, offset });
+      if (kind === "local") return new LocalASR({ workerPath: localWorker, modelDir, speaker, offset });
+      return new AppleASR(bins.asr, speaker, offset);
+    },
   });
   const api = createApi({
     settings, llm, appleTr, records, caps, version: app.getVersion(),
