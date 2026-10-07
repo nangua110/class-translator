@@ -73,7 +73,8 @@ export class LLM {
 
   summarize(transcript, previous, targetLabel, provider) {
     let prompt = `课堂转写如下：\n\n${transcript}`;
-    if (previous) prompt = `已有笔记（请在此基础上更新、合并，不要丢失已有重点）：\n\n${previous}\n\n` + prompt;
+    // 前面的笔记由 App 原样保留，这里只让 AI 写新的一段
+    if (previous) prompt = `这节课前面已经记过笔记，下面是它的结尾部分，只用来了解讲到哪了：不要重复、不要改写、不要再输出它。\n\n${previous}\n\n——以上是已有笔记——\n\n请只为下面这段新的课堂转写写笔记。\n\n` + prompt;
     return this.ask(provider, { system: SUMMARY_SYSTEM(targetLabel), prompt, effort: "medium", maxTokens: 16000, timeoutMs: 120_000 });
   }
 

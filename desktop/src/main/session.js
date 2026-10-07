@@ -1,5 +1,5 @@
-import { TARGET_LANGS, TRANSLATORS, SPEAKER_LANGS, SR, SUMMARY_INTERVAL_MS, SUMMARY_RETRY_MS } from "./langs.js";
-import { simplify, friendly } from "./text.js";
+import { TARGET_LANGS, TRANSLATORS, SPEAKER_LANGS, SR, SUMMARY_CONTEXT_CHARS, SUMMARY_INTERVAL_MS, SUMMARY_RETRY_MS } from "./langs.js";
+import { simplify, friendly, fmtTs } from "./text.js";
 import { acceptFinal, acceptPartial } from "./apple/filter.js";
 import { acceptCloudFinal } from "./cloud/filter.js";
 import { AllModelsBusy, NoKey } from "./llm/errors.js";
@@ -217,17 +217,14 @@ export class Session {
     this.send({ type: "summary_status", busy: true });
     let failed = false;
     try {
-      const label = TARGET_LANGS[this.cfg.target];
-      if (final) {
-        this.summary = await this.llm.summarize(this.lines.map((l) => l.text).join("\n"), "", label, this.summaryProvider());
-        this.summarizedUpto = this.lines.length;
-      } else {
-        const fresh = this.lines.slice(this.summarizedUpto);
-        if (fresh.length) {
-          const upto = this.lines.length;
-          this.summary = await this.llm.summarize(fresh.map((l) => l.text).join("\n"), this.summary, label, this.summaryProvider());
-          this.summarizedUpto = upto;
-        }
+      // 只增不改：每次只把新讲的内容整理成一段，接在后面；以前的笔记不再交给 AI 重写（重写时它会把前面的内容弄丢）
+      const fresh = this.lines.slice(this.summarizedUpto);
+      if (fresh.length) {
+        const upto = this.lines.length;
+        const part = await this.llm.summarize(fresh.map((l) => l.text).join("\n"), this.summary.slice(-SUMMARY_CONTEXT_CHARS), TARGET_LANGS[this.cfg.target], this.summaryProvider());
+        const head = `*${fmtTs(fresh[0].t)} – ${fmtTs(fresh.at(-1).t)}*`;
+        this.summary = [this.summary, `${head}\n\n${String(part).trim()}`].filter(Boolean).join("\n\n");
+        this.summarizedUpto = upto;
       }
       this.summary = simplify(this.summary, this.cfg.target);
       this.send({ type: "summary", md: this.summary });

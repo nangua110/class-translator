@@ -119,7 +119,7 @@ test("结束录制：关识别、等翻译、生成最终笔记、发 done", asy
   asrs[0].emit("message", final("A sentence."));
   await s.stop();
   assert.equal(asrs[0].closed, true);
-  assert.ok(sent.some((m) => m.type === "summary" && m.md === "笔记"));
+  assert.ok(sent.some((m) => m.type === "summary" && m.md.endsWith("笔记")));
   assert.deepEqual(sent.at(-1), { type: "done", record: "2026-10-07_09-00-00.md" });
 });
 
@@ -327,4 +327,25 @@ test("课堂笔记更新失败：状态里带 failed，30 秒后再试，而不�
   await new Promise((r) => setImmediate(r));
   assert.equal(calls, 2);
   assert.deepEqual(sent.filter((m) => m.type === "summary_status").at(-1), { type: "summary_status", busy: false, failed: false });
+});
+
+test("课堂笔记只增不改：每次只整理新讲的内容并接在后面，以前的笔记原样保留；结束时也不重写", async () => {
+  const seen = [];
+  const { s, sent, asrs } = setup({ llm: { summarize: async (transcript, previous) => { seen.push({ transcript, previous }); return `### 第 ${seen.length} 段`; } } });
+  s.audio(pcm(1));
+  asrs[0].emit("message", final("First part.", 0.95, 0));
+  await s.updateSummary();
+  asrs[0].emit("message", final("Second part.", 0.95, 200));
+  await s.updateSummary();
+  assert.equal(seen[1].transcript, "Second part.");
+  assert.match(seen[1].previous, /第 1 段/);
+  asrs[0].emit("message", final("Third part.", 0.95, 400));
+  await s.stop();
+  assert.equal(seen.length, 3);
+  assert.equal(seen[2].transcript, "Third part.");
+  const md = sent.filter((m) => m.type === "summary").at(-1).md;
+  assert.deepEqual(md.match(/第 \d 段/g), ["第 1 段", "第 2 段", "第 3 段"]);
+  assert.match(md, /\*00:00:00 – 00:00:00\*\n\n### 第 1 段\n\n\*00:03:20 – 00:03:20\*\n\n### 第 2 段/);
+  await s.updateSummary(true); // 没有新内容：不再请求，也不改笔记
+  assert.equal(seen.length, 3);
 });

@@ -149,7 +149,9 @@ function onMessage(ev) {
   } else if (m.type === "status") setFoot(m.recognizing);
   else if (m.type === "summary") {
     summaryMd = m.md;
-    $("summary").innerHTML = md2html(m.md);
+    const box = $("summary"), atEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    box.innerHTML = md2html(m.md);
+    if (atEnd) box.scrollTop = box.scrollHeight; // 新的一段接在最后：本来就在看最后的话，跟着滚下去
     if (tab === "notes") $("exportBtn").disabled = false;
   } else if (m.type === "summary_status") $("sumBadge").textContent = m.busy ? "归纳中…" : m.failed ? "更新失败，稍后重试" : "已更新";
   else if (m.type === "error") toast(m.msg);
