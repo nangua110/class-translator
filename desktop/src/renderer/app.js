@@ -5,7 +5,7 @@ marked.use({ breaks: true });
 const md2html = (md) => marked.parse(md.replace(/\*\*([^*\n]+?)\*\*/g, "<strong>$1</strong>"));
 let ws, ctx, stream, node, timerId;
 let state = "idle"; // idle | recording | paused
-let finishing = false; // 点了结束、后台还在收尾：这期间不能开新课
+let finishing = false; // 点了结束、后台还在收尾（生成最终笔记）；这期间也可以马上开新课，上一节课照样存盘
 let elapsed = 0, lastTick = 0, summaryMd = "";
 const SYSTEM = "__system__"; // 音源选"电脑内部声音"：由服务端直接录系统声音，不用麦克风
 const lines = {};
@@ -79,7 +79,7 @@ function setFoot(r = recognizing) {
 function setState(s) {
   state = s;
   setFoot();
-  $("startBtn").disabled = s !== "idle" || finishing;
+  $("startBtn").disabled = s !== "idle";
   $("pauseBtn").disabled = s === "idle";
   $("pauseBtn").textContent = s === "paused" ? "继续" : "暂停";
   $("stopBtn").disabled = s === "idle";
@@ -181,6 +181,7 @@ async function start() {
     ctx.createMediaStreamSource(stream).connect(node);
   }
 
+  if (finishing) { finishing = false; $("sumBadge").textContent = ""; } // 上一节课的最终笔记在后台存进记录，不再显示到这节课里
   elapsed = 0; lastTick = performance.now();
   timerId = setInterval(() => {
     const now = performance.now();

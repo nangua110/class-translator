@@ -51,6 +51,7 @@ export function registerIpc({ ipcMain, api, makeSession, makeSystemAudio }) {
     else if (cmd === "stop") {
       x.sys?.stop();
       x.sys = null;
+      live.delete(e.sender.id); // 收尾（最后一句、最终笔记、存盘）在后台做完；这期间窗口可以马上开新课，不会打断它
       try {
         await x.session.stop();
       } catch (err) { // 收尾出错也一定通知窗口结束，免得界面一直卡在"收尾中"

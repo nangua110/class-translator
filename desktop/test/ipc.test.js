@@ -27,3 +27,20 @@ test("消息带 sid；结束时出错也一定发 done，窗口不会卡在收�
   await cmd("stop");
   assert.deepEqual(sent.map((m) => [m.type, m.sid]), [["line", "s1.md"], ["error", "s1.md"], ["done", "s1.md"]]);
 });
+
+test("上一节课还在收尾（生成最终笔记）时可以马上开新课：收尾不被打断，照样存盘", async () => {
+  let n = 0, finish;
+  const disposed = [], stopped = [];
+  const { open, cmd } = setup((send) => {
+    const name = `s${++n}.md`;
+    return { name, configure() {}, dispose() { disposed.push(name); }, stop: () => new Promise((r) => { finish = () => { stopped.push(name); send({ type: "done", record: name }); r(); }; }) };
+  });
+  await open();
+  const stopping = cmd("stop");          // 第一节课开始收尾，还没完
+  const r = await open();                // 马上开第二节课
+  assert.equal(r.record, "s2.md");
+  assert.deepEqual(disposed, [], "收尾中的课不能被强行关掉");
+  finish();
+  await stopping;
+  assert.deepEqual(stopped, ["s1.md"]);
+});
