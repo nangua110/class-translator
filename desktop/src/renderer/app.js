@@ -151,7 +151,7 @@ function onMessage(ev) {
     summaryMd = m.md;
     $("summary").innerHTML = md2html(m.md);
     if (tab === "notes") $("exportBtn").disabled = false;
-  } else if (m.type === "summary_status") $("sumBadge").textContent = m.busy ? "归纳中…" : "已更新";
+  } else if (m.type === "summary_status") $("sumBadge").textContent = m.busy ? "归纳中…" : m.failed ? "更新失败，稍后重试" : "已更新";
   else if (m.type === "error") toast(m.msg);
   else if (m.type === "done") {
     finishing = false;
@@ -498,6 +498,8 @@ $("settingsSave").onclick = async () => {
     if (keyMode[p] === "remove") body[`clear_${p}_key`] = true;
     else body[`${p}_key`] = $(p + "Key").value; // 空着就是不修改
   }
+  const btn = $("settingsSave");
+  btn.disabled = true; btn.textContent = "正在测试 key…"; // 测试要联网，可能要等几秒到十几秒
   try {
     const r = await (await apiFetch("/api/settings", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
@@ -506,6 +508,7 @@ $("settingsSave").onclick = async () => {
     $("settings").close();
     toast(r.msg || "已保存，马上生效");
   } catch { toast("保存失败：连不上本地服务"); }
+  finally { btn.disabled = false; btn.textContent = "保存"; }
 };
 
 // App：按这台电脑能用的功能调整选项，第一次打开先看隐私说明

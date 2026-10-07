@@ -312,3 +312,19 @@ test("保存录音：关窗口时也收尾；磁盘写不进去只提示一次�
   s.dispose();
   assert.equal(rec.closed, 1);
 });
+
+test("课堂笔记更新失败：状态里带 failed，30 秒后再试，而不是等满一轮", async () => {
+  let t = 1_000_000, calls = 0;
+  const { s, sent, asrs } = setup({ llm: { summarize: async () => { calls += 1; if (calls === 1) throw new Error("503 UNAVAILABLE"); return "笔记"; } } });
+  s.now = () => t;
+  s.audio(pcm(1));
+  asrs[0].emit("message", final("A sentence."));
+  await s.updateSummary();
+  assert.deepEqual(sent.filter((m) => m.type === "summary_status").at(-1), { type: "summary_status", busy: false, failed: true });
+  t += 29_000; asrs[0].emit("message", final("Second one."));
+  assert.equal(calls, 1);
+  t += 2_000; asrs[0].emit("message", final("Third one."));
+  await new Promise((r) => setImmediate(r));
+  assert.equal(calls, 2);
+  assert.deepEqual(sent.filter((m) => m.type === "summary_status").at(-1), { type: "summary_status", busy: false, failed: false });
+});

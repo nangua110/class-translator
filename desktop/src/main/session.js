@@ -1,4 +1,4 @@
-import { TARGET_LANGS, TRANSLATORS, SPEAKER_LANGS, SR, SUMMARY_INTERVAL_MS } from "./langs.js";
+import { TARGET_LANGS, TRANSLATORS, SPEAKER_LANGS, SR, SUMMARY_INTERVAL_MS, SUMMARY_RETRY_MS } from "./langs.js";
 import { simplify, friendly } from "./text.js";
 import { acceptFinal, acceptPartial } from "./apple/filter.js";
 import { acceptCloudFinal } from "./cloud/filter.js";
@@ -21,6 +21,7 @@ export class Session {
     this.summary = "";
     this.summarizedUpto = 0;
     this.summarizing = false;
+    this.summaryFailing = false; // 上一次更新课堂笔记是不是失败了
     this.lastSummaryAt = this.now();
     this.translations = new Set();
     this.active = 0;
@@ -214,6 +215,7 @@ export class Session {
     this.summarizing = true;
     this.lastSummaryAt = this.now();
     this.send({ type: "summary_status", busy: true });
+    let failed = false;
     try {
       const label = TARGET_LANGS[this.cfg.target];
       if (final) {
@@ -231,10 +233,15 @@ export class Session {
       this.send({ type: "summary", md: this.summary });
       this.save();
     } catch (e) {
-      this.send({ type: "error", msg: `课堂笔记更新失败：${friendly(e)}` });
+      failed = true;
+      const retry = !final && !(e instanceof NoKey);
+      // 服务器忙、超时：过 30 秒就再试，不等满一轮；连续失败只提示第一次
+      if (retry) this.lastSummaryAt = this.now() - SUMMARY_INTERVAL_MS + SUMMARY_RETRY_MS;
+      if (!this.summaryFailing) this.send({ type: "error", msg: `课堂笔记更新失败：${friendly(e)}${retry ? "，过一会儿自动再试" : ""}` });
     } finally {
+      this.summaryFailing = failed;
       this.summarizing = false;
-      this.send({ type: "summary_status", busy: false });
+      this.send({ type: "summary_status", busy: false, failed });
     }
   }
 
