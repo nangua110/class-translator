@@ -1,6 +1,7 @@
 // 把流式识别器「只增不改」的结果切成句子：句末标点后面出现了下一句的词，上一句就定稿；其余是草稿。
 // 不依赖任何其他模块：后台线程（worker.cjs）会直接加载它。
 const SENTENCE_END = /[.?!]$/;
+export const MAX_PENDING_SEC = 20; // 这么久没有句末标点，就把攒着的话先定稿一次
 const HAS_WORD = /[A-Za-z0-9\u00c0-\u024f]/;
 
 export class SentenceSplitter {
@@ -19,21 +20,28 @@ export class SentenceSplitter {
         begin = i + 1;
       }
     }
-    if (flush && begin < tokens.length) {
+    // 老师一直讲、模型一直不给句号：攒的话超过 20 秒就先定稿（有标点正常分句时不会走到这里）
+    const ts = result.timestamps ?? [];
+    const tooLong = begin < tokens.length && (ts[tokens.length - 1] ?? 0) - (ts[begin] ?? 0) > MAX_PENDING_SEC;
+    if ((flush || tooLong) && begin < tokens.length) {
       finals.push(this.#make(result, begin, tokens.length));
       begin = tokens.length;
     }
     this.done = begin;
-    return { finals: finals.filter(Boolean), partial: tokens.slice(begin).join("").trim() };
+    return { finals: finals.filter(Boolean), partial: tokens.slice(begin).join("").trim(), partialConf: this.#conf(result, begin, tokens.length) };
   }
 
   reset() { this.done = 0; }
 
+  /** 这几个词片的平均把握（0~1）；没有把握值时为 -1 */
+  #conf(result, a, b) {
+    const probs = (result.ys_probs ?? []).slice(a, b);
+    return probs.length ? Math.exp(probs.reduce((x, y) => x + y, 0) / probs.length) : -1;
+  }
+
   #make(result, a, b) {
     const text = result.tokens.slice(a, b).join("").trim();
     if (!HAS_WORD.test(text)) return null; // 只有标点的空段（识别器重置后偶尔会多出一个 "."）
-    const probs = (result.ys_probs ?? []).slice(a, b);
-    const conf = probs.length ? Math.exp(probs.reduce((x, y) => x + y, 0) / probs.length) : -1;
-    return { text, conf, start: (result.start_time ?? 0) + ((result.timestamps ?? [])[a] ?? 0) };
+    return { text, conf: this.#conf(result, a, b), start: (result.start_time ?? 0) + ((result.timestamps ?? [])[a] ?? 0) };
   }
 }

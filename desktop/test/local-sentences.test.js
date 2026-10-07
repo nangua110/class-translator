@@ -12,8 +12,8 @@ const grow = (s, text, opts) => s.update(result(text, opts));
 
 test("句号后面出现下一句的词，上一句才定稿；其余是草稿", () => {
   const s = new SentenceSplitter();
-  assert.deepEqual(grow(s, " Good morning"), { finals: [], partial: "Good morning" });
-  assert.deepEqual(grow(s, " Good morning."), { finals: [], partial: "Good morning." });
+  assert.deepEqual(grow(s, " Good morning"), { finals: [], partial: "Good morning", partialConf: Math.exp(-0.2) });
+  assert.equal(grow(s, " Good morning.").partial, "Good morning.");
   const r = grow(s, " Good morning. Today we");
   assert.deepEqual(r.finals.map((f) => f.text), ["Good morning."]);
   assert.equal(r.partial, "Today we");
@@ -41,7 +41,7 @@ test("没有标点一直讲：平时不定稿，flush（端点 / 结束）时整
   assert.deepEqual(r.finals.map((f) => f.text), ["so we keep going and going"]);
   assert.equal(r.partial, "");
   s.reset();
-  assert.deepEqual(s.update(result("."), { flush: true }), { finals: [], partial: "" });
+  assert.deepEqual(s.update(result("."), { flush: true }), { finals: [], partial: "", partialConf: -1 });
 });
 
 test("reset 后从新的一段重新开始", () => {
@@ -58,4 +58,24 @@ test("acceptLocalFinal：把握低（别的语言）丢掉；英语保留并清�
   assert.equal(acceptLocalFinal({ text: "Thank you.", conf: 0.9, start: 0 }, "en"), null, "常见胡编句丢掉");
   assert.equal(acceptLocalFinal({ text: "Open the book.", conf: -1, start: 0 }, "en").text, "Open the book.", "没有把握值时不按把握过滤");
   assert.equal(acceptLocalFinal({ text: "Hello there.", conf: 0.9, start: 0 }, "zh"), null, "本地实时只出英语");
+});
+
+test("20 秒没有句末标点才强制定稿；有标点正常分句时不会把整句切断", () => {
+  const s = new SentenceSplitter();
+  // 每个词片 2 秒：讲了 30 秒，但每句都有句号
+  const r1 = grow(s, " One two three. Four five six. Seven eight nine. Ten eleven twelve", { step: 2 });
+  assert.deepEqual(r1.finals.map((f) => f.text), ["One two three.", "Four five six.", "Seven eight nine."]);
+  assert.equal(r1.partial, "Ten eleven twelve");
+  // 没有标点连讲超过 20 秒：整段定稿一次，之后接着切
+  const s2 = new SentenceSplitter();
+  assert.equal(grow(s2, " a b c d e f g h i j", { step: 2 }).finals.length, 0); // 18 秒
+  const r2 = grow(s2, " a b c d e f g h i j k l", { step: 2 });                 // 22 秒
+  assert.deepEqual(r2.finals.map((f) => f.text), ["a b c d e f g h i j k l"]);
+  assert.equal(r2.partial, "");
+  assert.equal(grow(s2, " a b c d e f g h i j k l m n", { step: 2 }).partial, "m n");
+});
+
+test("草稿带把握值（旁边有人说别的语言时用来隐藏乱码草稿）", () => {
+  const s = new SentenceSplitter();
+  assert.ok(Math.abs(grow(s, " Tong Yeminghau", { prob: -1.2 }).partialConf - Math.exp(-1.2)) < 1e-9);
 });

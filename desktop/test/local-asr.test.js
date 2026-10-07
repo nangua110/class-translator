@@ -21,9 +21,9 @@ const errors = (msgs) => msgs.filter((m) => m.type === "error").map((m) => m.msg
 test("线程的草稿和定稿转成统一的消息；定稿标明来源 local", () => {
   const { worker, msgs } = setup();
   worker.emit("message", { type: "ready" });
-  worker.emit("message", { type: "partial", text: "Good" });
+  worker.emit("message", { type: "partial", text: "Good", conf: 0.7 });
   worker.emit("message", { type: "final", text: "Good morning.", conf: 0.8, start: 1.2 });
-  assert.deepEqual(msgs, [{ type: "partial", text: "Good" }, { type: "final", source: "local", text: "Good morning.", conf: 0.8, start: 1.2 }]);
+  assert.deepEqual(msgs, [{ type: "partial", text: "Good", conf: 0.7 }, { type: "final", source: "local", text: "Good morning.", conf: 0.8, start: 1.2 }]);
 });
 
 test("音频按完整样本送进线程：半个样本留到下一次", () => {
@@ -124,4 +124,35 @@ test("模型加载慢造成的积压正在追上：不提示跟不上", () => {
   worker.emit("message", { type: "ready" });
   for (const p of [1, 6, 12, 18, 20]) worker.emit("message", { type: "tick", processed: p });
   assert.deepEqual(errors(msgs), []);
+});
+
+test("收尾时线程意外退出：close 马上返回，不用等满超时", async () => {
+  const { asr, worker } = setup();
+  worker.autoDone = false;
+  worker.emit("message", { type: "ready" });
+  const t0 = Date.now();
+  const closing = asr.close(5000);
+  setTimeout(() => worker.emit("exit", 1), 20);
+  await closing;
+  assert.ok(Date.now() - t0 < 1000, `等了 ${Date.now() - t0}ms`);
+});
+
+test("电脑一直跟不上：收尾有总时间上限，不会让「结束」等几十分钟", async () => {
+  const { asr, worker, exits } = setup();
+  worker.autoDone = false;
+  worker.emit("message", { type: "ready" });
+  const beat = setInterval(() => worker.emit("message", { type: "tick", processed: 1 }), 10); // 线程一直有动静
+  const t0 = Date.now();
+  await asr.close(5000, 5000, 80);
+  clearInterval(beat);
+  assert.ok(Date.now() - t0 < 1000, `等了 ${Date.now() - t0}ms`);
+  assert.deepEqual(exits, [0]);
+});
+
+test("一直落后 15 秒以上、没有在追上：也要提示", () => {
+  const { asr, worker, msgs } = setup();
+  worker.emit("message", { type: "ready" });
+  asr.feed(Buffer.alloc(32000 * 18));
+  for (const p of [2, 8, 14]) { worker.emit("message", { type: "tick", processed: p }); asr.feed(Buffer.alloc(32000 * 6)); } // 落后量稳定在 16 秒
+  assert.equal(errors(msgs).length, 1);
 });

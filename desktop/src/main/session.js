@@ -3,7 +3,7 @@ import { simplify, friendly } from "./text.js";
 import { acceptFinal, acceptPartial } from "./apple/filter.js";
 import { acceptCloudFinal } from "./cloud/filter.js";
 import { AllModelsBusy, NoKey } from "./llm/errors.js";
-import { acceptLocalFinal } from "./local/filter.js";
+import { acceptLocalFinal, LOCAL_MIN_CONF } from "./local/filter.js";
 
 const DEFAULTS = { speaker: "en", target: "zh", asr: "apple", translator: "gemini" };
 const MAX_PARALLEL_TRANSLATIONS = 6;
@@ -96,7 +96,9 @@ export class Session {
   }
 
   onAsr(asr, m) {
-    if (m.type === "partial") {
+    if (m.type === "partial" && asr.kind === "local" && m.conf >= 0 && m.conf < LOCAL_MIN_CONF) {
+      this.send({ type: "partial", text: "" }); // 把握很低：多半是旁边有人在说别的语言，乱码草稿不显示
+    } else if (m.type === "partial") {
       if (acceptPartial(m.text ?? "", asr.speaker)) this.send({ type: "partial", text: m.text });
     } else if (m.type === "final" && m.source === "local") {
       const r = acceptLocalFinal(m, asr.speaker);

@@ -23,7 +23,7 @@ const SR = 16000;
     enableEndpoint: 1,
     rule1MinTrailingSilence: 2.4,   // 还没识别出字时，静音多久算一段结束
     rule2MinTrailingSilence: 0.8,   // 识别出字之后，停顿多久算一段结束
-    rule3MinUtteranceLength: 20,    // 一直讲不停时，最长多久强制结束一段
+    rule3MinUtteranceLength: 120,   // 一直讲不停、中间没有停顿时，最长多久强制结束一段（20 秒没标点的兜底在句子切分器里，不会切断正常的句子）
   });
   const stream = recognizer.createStream();
   const splitter = new SentenceSplitter();
@@ -32,11 +32,11 @@ const SR = 16000;
   function step(flush) {
     while (recognizer.isReady(stream)) recognizer.decode(stream);
     const endpoint = flush || recognizer.isEndpoint(stream);
-    const { finals, partial } = splitter.update(recognizer.getResult(stream), { flush: endpoint });
+    const { finals, partial, partialConf } = splitter.update(recognizer.getResult(stream), { flush: endpoint });
     for (const f of finals) parentPort.postMessage({ type: "final", ...f });
     if (partial !== lastPartial) {
       lastPartial = partial;
-      parentPort.postMessage({ type: "partial", text: partial });
+      parentPort.postMessage({ type: "partial", text: partial, conf: partialConf });
     }
     if (endpoint) { recognizer.reset(stream); splitter.reset(); }
   }
@@ -52,7 +52,7 @@ const SR = 16000;
       step(false);
       parentPort.postMessage({ type: "tick", processed: samples / SR });
     } else if (m.type === "finish") {
-      stream.acceptWaveform(SR, new Float32Array(SR / 2)); // 补半秒静音，让最后几个词也解出来
+      stream.acceptWaveform(SR, new Float32Array(SR * 2)); // 补 2 秒静音：补少了最后一个词解不出来
       stream.inputFinished();
       step(true);
       parentPort.postMessage({ type: "done" });

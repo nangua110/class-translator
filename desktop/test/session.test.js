@@ -264,3 +264,12 @@ test("一种识别方式出错停掉后，换另一种还能用", () => {
   s.audio(pcm(1));
   assert.equal(asrs[2].kind, "cloud");
 });
+
+test("本地实时：把握低的草稿（旁边有人说中文）不显示，并清掉之前的草稿", () => {
+  const { s, sent, asrs } = setup();
+  s.configure({ asr: "local" });
+  s.audio(pcm(1));
+  asrs[0].emit("message", { type: "partial", text: "Good morning", conf: 0.75 });
+  asrs[0].emit("message", { type: "partial", text: "Tong Yeminghau, Zing yang", conf: 0.32 });
+  assert.deepEqual(sent.filter((m) => m.type === "partial").map((m) => m.text), ["Good morning", ""]);
+});

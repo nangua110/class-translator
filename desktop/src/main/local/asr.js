@@ -41,7 +41,7 @@ export class LocalASR extends EventEmitter {
   #onWorker(m) {
     if (m.type === "ready") { this.ready = true; clearTimeout(this.loadTimer); }
     this.touch?.();
-    if (m.type === "partial") this.emit("message", { type: "partial", text: m.text });
+    if (m.type === "partial") this.emit("message", { type: "partial", text: m.text, conf: m.conf });
     else if (m.type === "final") this.emit("message", { type: "final", source: "local", text: m.text, conf: m.conf, start: m.start });
     else if (m.type === "error") this.emit("message", { type: "error", msg: `本地实时识别出错：${String(m.msg).slice(0, 80)}` });
     else if (m.type === "done") this.onDone?.();
@@ -53,7 +53,7 @@ export class LocalASR extends EventEmitter {
     const lag = this.fedSec - processed;
     if (!this.lagMark) { this.lagMark = { processed, lag }; return; }
     if (processed - this.lagMark.processed < LAG_CHECK_SEC) return;
-    if (lag > LAG_WARN_SEC && lag > this.lagMark.lag) {
+    if (lag > LAG_WARN_SEC && lag > this.lagMark.lag - 1) { // 正在追上的话，落后量会明显变小
       this.lagNoted = true;
       this.emit("message", { type: "error", msg: "这台电脑的本地识别跟不上说话速度，字幕会越来越晚；建议在「识别方式」里改用「云端（Gemini）」" });
     }
@@ -64,6 +64,7 @@ export class LocalASR extends EventEmitter {
     if (this.exited) return;
     this.exited = true;
     clearTimeout(this.loadTimer);
+    this.onDone?.(); // 正在收尾的话不用再等了
     this.emit("exit", code);
   }
 
@@ -77,18 +78,21 @@ export class LocalASR extends EventEmitter {
     this.worker.postMessage({ type: "audio", pcm: new Uint8Array(data.subarray(0, even)) }); // 复制一份交给线程
   }
 
-  /** 不再送音频：让线程把积压的音频识别完、最后半句定稿。线程 timeoutMs 没动静就强制结束；模型还没加载好时多等一会儿（loadTimeoutMs） */
-  async close(timeoutMs = 10_000, loadTimeoutMs = 60_000) {
+  /** 不再送音频：让线程把积压的音频识别完、最后半句定稿。线程 timeoutMs 没动静就强制结束；模型还没加载好时多等一会儿（loadTimeoutMs）；总共最多等 totalMs，电脑一直跟不上时不让「结束」等太久 */
+  async close(timeoutMs = 10_000, loadTimeoutMs = 60_000, totalMs = 90_000) {
     if (!this.worker || this.exited) return;
-    let timer;
+    let timer, cap;
     await new Promise((resolve) => {
       this.onDone = resolve;
+      cap = setTimeout(resolve, totalMs);
       this.touch = () => { clearTimeout(timer); timer = setTimeout(resolve, this.ready ? timeoutMs : loadTimeoutMs); };
       this.touch();
       this.worker.postMessage({ type: "finish" });
     });
     clearTimeout(timer);
+    clearTimeout(cap);
     this.touch = null;
+    this.onDone = null;
     this.#exit(0);
     await this.worker.terminate();
   }
