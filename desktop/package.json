@@ -11,16 +11,18 @@
     "test": "node --test \"test/**/*.test.js\"",
     "helpers": "bash scripts/build-helpers.sh",
     "vendor": "node scripts/vendor.mjs",
-    "start": "npm run helpers && npm run vendor && electron .",
-    "dist": "npm run helpers && npm run vendor && electron-builder --mac && node scripts/check-package.mjs",
-    "dist:win": "npm run vendor && electron-builder --win --x64 -c.nsis.useZip=false && electron-builder --win --arm64 && node scripts/check-package.mjs"
+    "models": "bash scripts/fetch-models.sh",
+    "start": "npm run helpers && npm run vendor && npm run models && electron .",
+    "dist": "npm run helpers && npm run vendor && npm run models && electron-builder --mac && node scripts/check-package.mjs",
+    "dist:win": "npm run vendor && npm run models && electron-builder --win --x64 -c.nsis.useZip=false && electron-builder --win --arm64 && node scripts/check-package.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
     "@google/genai": "^2.27.0",
     "marked": "^18.1.0",
     "onnxruntime-web": "^1.30.0",
-    "opencc-js": "^1.4.2"
+    "opencc-js": "^1.4.2",
+    "sherpa-onnx": "^1.13.8"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.1",
