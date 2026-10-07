@@ -21,21 +21,39 @@ function checkFile(name, buf) {
   if (KEY_RE.test(buf.toString("latin1"))) problems.push(`疑似包含 API key：${name}`);
 }
 
-const apps = fs.readdirSync(dist).filter((d) => d.startsWith("mac")).map((d) => path.join(dist, d, "课堂同传.app"));
-if (!apps.length) throw new Error("dist 里没有找到 课堂同传.app");
-for (const app of apps) {
-  const res = path.join(app, "Contents/Resources");
+// 找出所有打好的 App：Mac 在 dist/mac*/课堂同传.app/Contents/Resources，Windows 在 dist/win*-unpacked/resources
+const resourceDirs = fs.readdirSync(dist).flatMap((d) => {
+  if (d.startsWith("mac")) return [path.join(dist, d, "课堂同传.app", "Contents", "Resources")];
+  if (d.startsWith("win") && d.endsWith("unpacked")) return [path.join(dist, d, "resources")];
+  return [];
+}).filter((r) => fs.existsSync(path.join(r, "app.asar")));
+if (!resourceDirs.length) throw new Error("dist 里没有找到打好的 App");
+
+const MUST_HAVE = ["assets/silero_vad.onnx", "node_modules/onnxruntime-web/dist/ort.node.min.js"];
+const MUST_UNPACKED = "app.asar.unpacked/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm";
+for (const res of resourceDirs) {
   walk(res);
   const archive = path.join(res, "app.asar");
-  for (const f of asar.listPackage(archive)) {
-    const rel = f.replace(/^\//, "");
+  const listed = asar.listPackage(archive).map((f) => f.replace(/^[\\/]/, "").replaceAll("\\", "/"));
+  for (const rel of listed) {
     let buf;
     try { buf = asar.extractFile(archive, rel); } catch { continue; } // 目录
     checkFile(rel, buf);
   }
+  if (res.includes(`${path.sep}win`)) {
+    // Windows 包里的文件名必须是英文：ARM64 安装程序用 zip，解压组件按系统编码读文件名，中文会变乱码（主程序找不到）
+    const appDir = path.dirname(res);
+    for (const name of fs.readdirSync(appDir)) {
+      if (/[^\x20-\x7e]/.test(name)) problems.push(`Windows 包里有非英文文件名：${name}（${appDir}）`);
+    }
+  }
+  for (const need of MUST_HAVE) if (!listed.includes(need)) problems.push(`缺少必需文件：${need}（${res}）`);
+  if (!fs.existsSync(path.join(res, MUST_UNPACKED))) problems.push(`缺少人声检测运行文件：${MUST_UNPACKED}（${res}）`);
+  const ortFiles = listed.filter((f) => f.startsWith("node_modules/onnxruntime-web/dist/") && f.split("/").length === 4);
+  if (ortFiles.length > 4) problems.push(`onnxruntime-web 多带了文件：${ortFiles.length} 个（${res}）`);
 }
 if (problems.length) {
   console.error("打包检查失败：\n" + problems.join("\n"));
   process.exit(1);
 }
-console.log(`打包检查通过：${apps.length} 个 App，未发现机密文件或 key`);
+console.log(`打包检查通过：${resourceDirs.length} 个 App，未发现机密文件或 key，必需文件齐全`);

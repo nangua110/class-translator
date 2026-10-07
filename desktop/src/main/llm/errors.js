@@ -1,5 +1,9 @@
 export class NoKey extends Error { name = "NoKey"; }               // 还没填这家的 API key
-export class AllModelsBusy extends Error { name = "AllModelsBusy"; } // 所有 Gemini 模型都在冷却（额度用完 / 繁忙）
+// 所有 Gemini 模型都在冷却：quota 为 true 表示都是额度用完，false 表示有的只是超时 / 服务器忙
+export class AllModelsBusy extends Error {
+  name = "AllModelsBusy";
+  constructor(message, { quota = true } = {}) { super(message); this.quota = quota; }
+}
 export class TimeoutError extends Error { name = "TimeoutError"; }
 
 export function withTimeout(promise, ms) {

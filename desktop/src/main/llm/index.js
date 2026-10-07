@@ -4,7 +4,7 @@ import { FAST_MODELS, SUMMARY_MODELS } from "../langs.js";
 import { NoKey, withTimeout } from "./errors.js";
 import { GeminiPool, orderModels } from "./gemini.js";
 import { askClaude } from "./claude.js";
-import { TRANSLATE_SYSTEM, SUMMARY_SYSTEM, REPORT_OUTLINE_SYSTEM, REPORT_BODY_SYSTEM } from "./prompts.js";
+import { TRANSLATE_SYSTEM, SUMMARY_SYSTEM, REPORT_OUTLINE_SYSTEM, REPORT_BODY_SYSTEM, RECOGNIZE_SYSTEM, RECOGNIZE_SCHEMA } from "./prompts.js";
 
 const DEFAULT_FACTORIES = {
   gemini: (apiKey) => new GoogleGenAI({ apiKey }),
@@ -45,6 +45,24 @@ export class LLM {
       return withTimeout(askClaude(this.claude, model, { system, prompt, effort, maxTokens }), timeoutMs);
     }
     throw new Error(`未知的服务：${provider}`);
+  }
+
+  /** 云端识别（只有 Gemini 能听音频）：只听写，返回转写和语言。speakerLabel 为 null 表示自动 */
+  async recognize(wav, speakerLabel) {
+    if (!this.gemini) throw new NoKey("还没填写 Gemini 的 API key（云端识别要用它）");
+    const hint = speakerLabel
+      ? `说话人主要讲${speakerLabel}，但旁边也可能有人说别的语言：一律按实际听到的语言逐字转写，绝不能把它翻译成${speakerLabel}；lang 填实际听到的语言。`
+      : "";
+    // 不附带上文：附带的话模型偶尔会把上文照抄进转写结果
+    const contents = [{ role: "user", parts: [
+      { inlineData: { mimeType: "audio/wav", data: wav.toString("base64") } },
+      { text: "请处理这段录音。" },
+    ] }];
+    const config = { systemInstruction: RECOGNIZE_SYSTEM(hint), responseMimeType: "application/json", responseJsonSchema: RECOGNIZE_SCHEMA };
+    const models = orderModels(FAST_MODELS, this.settings.pref("geminiModel", "auto"));
+    const resp = await this.gemini.generate(models, { contents, config }, 15_000); // 正常几秒就回；8 秒录音上传要时间，网络慢时留足余量
+    const r = parseJson(resp.text ?? "");
+    return { text: String(r.text ?? "").trim(), lang: String(r.lang ?? "") };
   }
 
   translate(sentence, context, targetLabel, provider) {

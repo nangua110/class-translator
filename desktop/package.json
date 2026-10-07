@@ -1,7 +1,7 @@
 {
   "name": "class-translator",
   "productName": "课堂同传",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "课堂实时字幕与翻译",
   "author": "南瓜",
   "license": "MIT",
@@ -12,12 +12,14 @@
     "helpers": "bash scripts/build-helpers.sh",
     "vendor": "node scripts/vendor.mjs",
     "start": "npm run helpers && npm run vendor && electron .",
-    "dist": "npm run helpers && npm run vendor && electron-builder --mac && node scripts/check-package.mjs"
+    "dist": "npm run helpers && npm run vendor && electron-builder --mac && node scripts/check-package.mjs",
+    "dist:win": "npm run vendor && electron-builder --win --x64 -c.nsis.useZip=false && electron-builder --win --arm64 && node scripts/check-package.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
     "@google/genai": "^2.27.0",
     "marked": "^18.1.0",
+    "onnxruntime-web": "^1.30.0",
     "opencc-js": "^1.4.2"
   },
   "devDependencies": {

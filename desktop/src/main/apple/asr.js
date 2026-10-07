@@ -10,6 +10,7 @@ export class AppleASR extends EventEmitter {
     this.speaker = speaker;
     this.offset = offset; // 这个识别进程开始时，这节课已经录了多少秒
     this.p = null;
+    this.kind = "apple";
   }
   start() {
     this.byUs = false; // 是我们自己 close / kill 的；被系统信号意外结束（真崩溃）不算

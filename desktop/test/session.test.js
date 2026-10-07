@@ -5,14 +5,14 @@ import { Session } from "../src/main/session.js";
 import { AllModelsBusy } from "../src/main/llm/errors.js";
 
 class FakeAsr extends EventEmitter {
-  constructor(speaker, offset) { super(); Object.assign(this, { speaker, offset, fed: 0, closed: false, killed: false }); }
+  constructor(speaker, offset, kind = "apple") { super(); Object.assign(this, { speaker, offset, kind, fed: 0, closed: false, killed: false }); }
   start() {}
   feed(b) { this.fed += b.length; }
   async close() { this.closed = true; }
   kill() { this.killed = true; }
 }
 
-function setup({ llm = {}, appleTr = {}, caps = { appleAsr: true } } = {}) {
+function setup({ llm = {}, appleTr = {}, caps = { appleAsr: true, cloudAsr: true } } = {}) {
   const sent = [], asrs = [], saved = [];
   const s = new Session({
     send: (m) => sent.push(m),
@@ -20,7 +20,7 @@ function setup({ llm = {}, appleTr = {}, caps = { appleAsr: true } } = {}) {
     appleTr: { translate: async () => ({ tr: "苹果译", code: "" }), ...appleTr },
     records: { newName: () => "2026-10-07_09-00-00.md", save: (_n, _s, lines) => saved.push(lines.length) },
     caps,
-    makeAsr: (sp, off) => { const a = new FakeAsr(sp, off); asrs.push(a); return a; },
+    makeAsr: (kind, sp, off) => { const a = new FakeAsr(sp, off, kind); asrs.push(a); return a; },
     sleep: async () => {},
   });
   s.configure({ speaker: "en", target: "zh", asr: "apple", translator: "gemini" });
@@ -134,11 +134,12 @@ test("关窗口 / 退出（dispose）：杀掉识别程序并存盘", () => {
 });
 
 test("不支持苹果识别的电脑：只提示一次，不崩", () => {
-  const { s, sent, asrs } = setup({ caps: { appleAsr: false } });
+  const { s, sent, asrs } = setup({ caps: { appleAsr: false, cloudAsr: true } });
   s.audio(pcm(1)); s.audio(pcm(1));
   assert.equal(asrs.length, 0);
   assert.equal(errors(sent).length, 1);
   assert.match(errors(sent)[0], /macOS 26/);
+  assert.match(errors(sent)[0], /云端/);
 });
 
 test("暂停时不送音频", () => {
@@ -157,4 +158,53 @@ test("文稿文件夹写不进去：只提示一次，不抛错，字幕照常�
   await s.idle();
   assert.equal(sent.filter((m) => m.type === "line").length, 2);
   assert.equal(errors(sent).filter((m) => m.includes("文稿")).length, 1);
+});
+
+test("云端识别：字幕先出，翻译按所选方式另外做并带上前几句上文；时间加上引擎的起点", async () => {
+  const asked = [];
+  const { s, sent, asrs } = setup({ llm: { translate: async (t, ctx, target, provider) => { asked.push({ t, ctx, provider }); return `译:${t}`; } } });
+  s.configure({ asr: "cloud", translator: "claude" });
+  s.audio(pcm(3));
+  assert.equal(asrs[0].kind, "cloud");
+  asrs[0].offset = 3;
+  asrs[0].emit("message", { type: "status", recognizing: true });
+  asrs[0].emit("message", { type: "final", source: "cloud", text: "The second law.", lang: "en", start: 1 });
+  asrs[0].emit("message", { type: "final", source: "cloud", text: "Entropy never decreases.", lang: "en", start: 5 });
+  await s.idle();
+  const lines = sent.filter((m) => m.type === "line");
+  assert.equal(lines[0].tr, "", "字幕先出，译文随后到");
+  assert.equal(lines[0].t, 4);
+  assert.deepEqual(sent.filter((m) => m.type === "translation").map((m) => m.tr).sort(), ["译:Entropy never decreases.", "译:The second law."]);
+  const second = asked.find((a) => a.t === "Entropy never decreases.");
+  assert.deepEqual(second.ctx, ["The second law."], "翻译时带上前面的句子做上文");
+  assert.equal(second.provider, "claude", "用的是所选的翻译方式");
+  assert.deepEqual(sent.find((m) => m.type === "status"), { type: "status", recognizing: true });
+});
+
+test("云端识别：别的语言丢掉，所选语言照常后台翻译", async () => {
+  const { s, sent, asrs } = setup();
+  s.configure({ asr: "cloud" });
+  s.audio(pcm(1));
+  asrs[0].emit("message", { type: "final", source: "cloud", text: "同学们好", lang: "zh", start: 0 });
+  asrs[0].emit("message", { type: "final", source: "cloud", text: "Good morning.", lang: "en", start: 2 });
+  await s.idle();
+  assert.deepEqual(sent.filter((m) => m.type === "line").map((m) => m.text), ["Good morning."]);
+  assert.equal(sent.find((m) => m.type === "translation").tr, "译:Good morning.");
+});
+
+test("从苹果识别切到云端：关掉旧引擎，换新引擎", () => {
+  const { s, asrs } = setup();
+  s.audio(pcm(1));
+  s.configure({ asr: "cloud" });
+  assert.equal(asrs[0].closed, true);
+  s.audio(pcm(1));
+  assert.equal(asrs[1].kind, "cloud");
+});
+
+test("没有苹果识别的电脑选云端：正常工作，不提示 macOS 26", () => {
+  const { s, sent, asrs } = setup({ caps: { appleAsr: false, cloudAsr: true } });
+  s.configure({ asr: "cloud" });
+  s.audio(pcm(1));
+  assert.equal(asrs.length, 1);
+  assert.equal(errors(sent).length, 0);
 });

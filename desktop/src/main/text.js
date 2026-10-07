@@ -50,7 +50,8 @@ export function fmtTs(seconds) {
 export function friendly(err) {
   const msg = String(err?.message ?? err);
   if (err instanceof NoKey) return msg;
-  if (err instanceof AllModelsBusy || msg.includes("PerDay")) return "Gemini 今天的免费额度用完了";
+  if ((err instanceof AllModelsBusy && err.quota) || msg.includes("PerDay")) return "Gemini 今天的免费额度用完了";
+  if (err instanceof AllModelsBusy) return "Gemini 服务器忙或网络太慢";
   if (err instanceof TimeoutError) return "响应超时";
   if (msg.includes("429")) return "请求太频繁，被限流了";
   if (/503|UNAVAILABLE|overloaded/i.test(msg)) return "服务器繁忙";

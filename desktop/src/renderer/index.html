@@ -170,7 +170,8 @@
   <h3>使用前请看一下</h3>
   <section>
     <table class="privacy">
-      <tr><td>苹果识别、苹果翻译</td><td>只在这台电脑上处理，不上传</td></tr>
+      <tr class="apple-only"><td>苹果识别、苹果翻译</td><td>只在这台电脑上处理，不上传</td></tr>
+      <tr><td>云端识别（Gemini）</td><td>有人说话的音频片段会发送给 Google</td></tr>
       <tr><td>Gemini 翻译、课堂笔记、课后精讲</td><td>转写的文字会发送给 Google</td></tr>
       <tr><td>Claude 翻译、课堂笔记、课后精讲</td><td>转写的文字会发送给 Anthropic</td></tr>
       <tr><td>南瓜（作者）</td><td>收不到任何数据：App 里没有统计、没有上传</td></tr>
@@ -205,7 +206,7 @@
   </section>
   <section>
     <div class="row"><b>课堂记录</b></div>
-    <p class="hint">课堂记录和课后精讲都保存在「文稿/课堂同传」文件夹里，可以随时删除。</p>
+    <p class="hint">课堂记录和课后精讲都保存在「文稿」（Windows 上叫「文档」）里的「课堂同传」文件夹，可以随时删除。</p>
     <p><button id="openRecords" type="button">打开记录文件夹</button></p>
   </section>
   <p class="hint">key 用系统加密保存在这台电脑上，界面上只显示末尾 4 位。</p>
@@ -213,6 +214,7 @@
     <button class="primary" id="settingsSave" type="button">保存</button></div>
 </dialog>
 <script src="bridge.js"></script>
+<script src="errors.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
