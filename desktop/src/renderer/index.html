@@ -74,6 +74,7 @@
   .powered { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; color: var(--muted);
     opacity: .8; font-size: 12px; letter-spacing: .2px; white-space: nowrap; cursor: default; }
   .powered b { color: #e8833a; font-weight: 600; }
+  .card-foot .upd { margin-left: 10px; padding: 3px 10px; font-size: 13px; color: var(--accent); border-color: var(--accent); }
   .tabs { display: inline-flex; background: var(--bg); border-radius: 10px; padding: 3px; gap: 2px; }
   .tab { border: none; background: none; padding: 4px 12px; font-size: 15px; font-weight: 600; color: var(--muted); border-radius: 8px; }
   .tab.on { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
@@ -166,6 +167,7 @@
         <path d="M32 14c-2-4 0-8 4-9" stroke="#6fb36b" stroke-width="4" fill="none" stroke-linecap="round"/>
         <ellipse cx="22" cy="38" rx="12" ry="16" fill="#f7934c"/><ellipse cx="42" cy="38" rx="12" ry="16" fill="#f7934c"/>
         <ellipse cx="32" cy="38" rx="12" ry="17" fill="#ffa862"/></svg>Powered by <b>南瓜</b><span id="ver"></span></span>
+      <button class="upd" id="updBtn" hidden></button>
     </div>
   </section>
   <section class="card">
@@ -195,6 +197,7 @@
       <tr><td>云端识别（Gemini）</td><td>有人说话的音频片段会发送给 Google</td></tr>
       <tr><td>Gemini 翻译、课堂笔记、课后精讲</td><td>转写的文字会发送给 Google</td></tr>
       <tr><td>Claude 翻译、课堂笔记、课后精讲</td><td>转写的文字会发送给 Anthropic</td></tr>
+      <tr><td>检查更新</td><td>打开 App 时向 GitHub 查询最新版本号，不发送任何个人信息</td></tr>
       <tr><td>南瓜（作者）</td><td>收不到任何数据：App 里没有统计、没有上传</td></tr>
     </table>
     <p class="hint">课堂录音前，请先确认学校和老师的规定。</p>
@@ -209,6 +212,13 @@
   </section>
   <div class="actions"><button id="audiosFolder" type="button">打开录音文件夹</button>
     <button class="primary" id="audiosClose" type="button">关闭</button></div>
+</dialog>
+<dialog id="update">
+  <h3 id="updTitle">有新版本</h3>
+  <section><p id="updText"></p><p class="hint" id="updHint"></p></section>
+  <div class="actions"><button id="updLater" type="button">以后再说</button>
+    <button id="updPage" type="button">打开下载页</button>
+    <button class="primary" id="updGo" type="button">下载并安装</button></div>
 </dialog>
 <dialog id="settings">
   <h3>AI 模型与 API</h3>

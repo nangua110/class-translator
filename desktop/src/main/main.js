@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, safeStorage, session, shell, systemPreferences } from "electron";
+import { spawn } from "node:child_process";
+import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, net, safeStorage, session, shell, systemPreferences } from "electron";
 import { SR } from "./langs.js";
 import { Settings } from "./store/settings.js";
 import { Records } from "./store/records.js";
@@ -18,6 +19,7 @@ import { VoiceDetector } from "./cloud/vad.js";
 import { CloudASR } from "./cloud/asr.js";
 import { LocalASR } from "./local/asr.js";
 import { AudioRecorder, cleanOldAudio } from "./store/audio.js";
+import { Updater } from "./update.js";
 
 const here = import.meta.dirname;
 app.setName("课堂同传");
@@ -50,8 +52,33 @@ function build() {
       return new AppleASR(bins.asr, speaker, offset);
     },
   });
+  // 更新：Mac 没有开发者签名，不能自己替换自己，只能下载好安装包并打开；Windows 直接运行安装程序，装完自动重新打开
+  const updater = new Updater({
+    version: process.env.CT_FAKE_VERSION ?? app.getVersion(), platform: process.platform,
+    base: process.env.CT_UPDATE_BASE, // 测试时指向本机的假发布页
+    arch: process.platform === "darwin" && app.runningUnderARM64Translation ? "arm64" : process.arch,
+    dir: path.join(app.getPath("temp"), "ClassTranslatorUpdate"),
+    fetch: (url, opts) => net.fetch(url, opts), // 走系统的网络设置（包括系统代理）
+    redirectOf: (url) => new Promise((resolve, reject) => { // 这个地址会跳到哪里（不跟着跳）
+      const req = net.request({ url, method: "HEAD", redirect: "manual" });
+      req.on("redirect", (_status, _method, to) => { req.abort(); resolve(to); });
+      req.on("response", () => resolve(url));
+      req.on("error", reject);
+      setTimeout(() => { req.abort(); reject(new Error("超时")); }, 15_000).unref();
+      req.end();
+    }),
+    install: async (file) => {
+      if (process.platform === "win32") {
+        spawn(file, ["/S", "--force-run"], { detached: true, stdio: "ignore" }).unref();
+        setTimeout(() => app.quit(), 800);
+      } else {
+        const err = await shell.openPath(file);
+        if (err) throw new Error(`下载失败（安装包打不开：${err}）`);
+      }
+    },
+  });
   const api = createApi({
-    settings, llm, appleTr, records, caps, version: app.getVersion(), cleanAudio,
+    settings, llm, appleTr, records, caps, version: app.getVersion(), cleanAudio, updater, quit: () => app.quit(),
     openExternal: (u) => shell.openExternal(u),
     openPath: (p) => { fs.mkdirSync(p, { recursive: true }); return shell.openPath(p); },
     askMic: () => (process.platform === "darwin" ? systemPreferences.askForMediaAccess("microphone") : Promise.resolve(true)),

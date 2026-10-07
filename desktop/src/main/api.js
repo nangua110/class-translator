@@ -3,6 +3,7 @@ import { friendly, simplify } from "./text.js";
 import { isAuthError } from "./llm/errors.js";
 import { reportMarkdown } from "./store/records.js";
 import fs from "node:fs";
+import { RELEASES } from "./update.js";
 import { isRecordingTo, listAudio, readAudioChunk } from "./store/audio.js";
 
 const LABEL = { gemini: "Gemini", claude: "Claude" };
@@ -11,7 +12,7 @@ const AUDIO_CHUNK_SEC = 120;     // 播放录音时一次给窗口多长一段
 const safeName = (s) => String(s ?? "课后精讲").replace(/[\\/:*?"<>|]/g, "_").slice(0, 80);
 
 /** 窗口调用的全部接口（与网页版 /api/* 同名同参数，前端改动最小） */
-export function createApi({ settings, llm, appleTr, records, caps, version, openExternal, openPath, askMic, savePdf, cleanAudio }) {
+export function createApi({ settings, llm, appleTr, records, caps, version, openExternal, openPath, askMic, savePdf, cleanAudio, updater, quit }) {
   const audioPrefs = () => ({ saveAudio: !!settings.pref("saveAudio", false), audioKeepDays: settings.pref("audioKeepDays", 7) });
   async function getSettings(q) {
     const src = q.get("src") ?? "en", tgt = q.get("tgt") ?? "zh";
@@ -100,6 +101,13 @@ export function createApi({ settings, llm, appleTr, records, caps, version, open
         try { fs.unlinkSync(records.audioFile(name)); } catch (e) { return { ok: false, msg: `删除失败：${friendly(e)}` }; }
         return { ok: true };
       }
+      case "POST /api/update-check": return updater ? updater.check() : { state: "none" }; // 打开窗口时查一次有没有新版
+      case "GET /api/update": return updater ? updater.status() : { state: "none" };
+      case "POST /api/update-install": // 下载在后台进行，窗口用 GET /api/update 看进度
+        updater?.downloadAndInstall();
+        return updater ? updater.status() : { state: "none" };
+      case "POST /api/update-page": openExternal(`${RELEASES}/latest`); return { ok: true };
+      case "POST /api/quit": quit?.(); return { ok: true };
       case "POST /api/privacy-accepted":
         settings.setPref("privacyAccepted", true);
         try { records.ensureDir(); } catch {} // 让系统的「文稿」权限询问在这时弹出，而不是上课中途

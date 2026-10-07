@@ -511,10 +511,57 @@ $("settingsSave").onclick = async () => {
   finally { btn.disabled = false; btn.textContent = "保存"; }
 };
 
+// ---------- 更新：打开时查一次；Windows 点一下自动装好，Mac 下载好安装包后要自己拖进「应用程序」 ----------
+let upd = { state: "none" }, updTimer = null;
+const isWin = () => window.APP_INFO?.caps.platform === "win32";
+async function updCall(path, method = "POST") {
+  try { upd = await (await apiFetch(path, { method })).json(); } catch {}
+  renderUpdate();
+}
+function renderUpdate() {
+  const s = upd.state;
+  $("updBtn").hidden = !upd.latest || s === "none";
+  $("updBtn").textContent = s === "downloading" ? `正在下载新版 ${upd.percent}%` : `有新版 v${upd.latest}，点击更新`;
+  $("updTitle").textContent = `有新版本 v${upd.latest}`;
+  const busy = s === "downloading";
+  $("updGo").disabled = busy;
+  $("updGo").hidden = false;
+  $("updGo").textContent = busy ? `正在下载 ${upd.percent}%` : isWin() ? "下载并安装" : "下载安装包";
+  $("updHint").textContent = "";
+  if (s === "available") {
+    $("updText").textContent = `现在用的是 v${upd.current}。`;
+    $("updHint").textContent = isWin() ? "下载完会自动安装，装好后课堂同传会重新打开。" : "下载完会打开安装包，把「课堂同传」拖进「应用程序」替换旧版就行。";
+  } else if (busy) {
+    $("updText").textContent = "正在下载新版，可以先关掉这个窗口继续用，下载好会提示。";
+  } else if (s === "ready") {
+    $("updText").textContent = isWin() ? "正在安装，课堂同传马上会关闭，装好后自动重新打开。"
+      : "安装包已经打开。请先退出课堂同传，再把安装包窗口里的「课堂同传」拖进「应用程序」，提示时选「替换」。";
+    $("updGo").textContent = "退出课堂同传";
+    $("updGo").hidden = isWin();
+  } else if (s === "error") {
+    $("updText").textContent = `${upd.msg}。可以再试一次，或者打开下载页自己下载。`;
+    $("updGo").textContent = "再试一次";
+  }
+  clearTimeout(updTimer);
+  if (busy) updTimer = setTimeout(async () => {
+    await updCall("/api/update", "GET");
+    if (upd.state !== "downloading" && !$("update").open) $("update").showModal(); // 下载完（或失败）时把窗口弹回来
+  }, 700);
+}
+$("updBtn").onclick = () => { renderUpdate(); $("update").showModal(); };
+$("updLater").onclick = () => $("update").close();
+$("updPage").onclick = () => apiFetch("/api/update-page", { method: "POST" });
+$("updGo").onclick = () => {
+  if (upd.state === "ready") return apiFetch("/api/quit", { method: "POST" });
+  if (state !== "idle") return toast("正在录制，结束录制后再更新");
+  updCall("/api/update-install");
+};
+
 // App：按这台电脑能用的功能调整选项，第一次打开先看隐私说明
 apiFetch("/api/app-info").then((r) => r.json()).then((info) => {
   window.APP_INFO = info;
   if (info.version) $("ver").textContent = ` · v${info.version}`;
+  updCall("/api/update-check");
   $("saveAudio").checked = !!info.saveAudio;
   $("keepWrap").hidden = !info.saveAudio;
   $("keepDays").value = String(info.audioKeepDays ?? 7);

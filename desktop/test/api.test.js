@@ -29,6 +29,8 @@ function setup({ testKey = async () => "ok", report } = {}) {
     appleTr: { status: async () => "installed" },
     caps: { appleAsr: true, appleTranslate: true, systemAudio: true },
     openExternal: (u) => calls.push(["open", u]), openPath: (p) => calls.push(["path", p]),
+    updater: { check: async () => ({ state: "available", latest: "9.9.9" }), status: () => ({ state: "downloading", percent: 40 }), downloadAndInstall: () => calls.push(["install"]) },
+    quit: () => calls.push(["quit"]),
     askMic: async () => true, savePdf: async (html, name) => ({ ok: true, file: `/tmp/${name}.pdf` }),
   });
   return { api, records, settings, calls, configured: () => configured };
@@ -176,4 +178,14 @@ test("录音列表：时长、大小、还有几天清理；删除只删录音�
   assert.equal(records.exists(NAME), true); // 文字记录还在
   assert.equal(fs.existsSync(path.join(records.dir, "别的歌.wav")), true);
   assert.deepEqual(await api("/api/audios", "GET"), []);
+});
+
+test("更新：检查、看进度、开始下载、打开下载页、退出", async () => {
+  const { api, calls } = setup();
+  assert.deepEqual(await api("/api/update-check", "POST"), { state: "available", latest: "9.9.9" });
+  assert.deepEqual(await api("/api/update", "GET"), { state: "downloading", percent: 40 });
+  await api("/api/update-install", "POST");
+  await api("/api/update-page", "POST");
+  await api("/api/quit", "POST");
+  assert.deepEqual(calls, [["install"], ["open", "https://github.com/nangua110/class-translator/releases/latest"], ["quit"]]);
 });
