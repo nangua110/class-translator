@@ -10,13 +10,13 @@ let elapsed = 0, lastTick = 0, summaryMd = "";
 const SYSTEM = "__system__"; // 音源选"电脑内部声音"：由服务端直接录系统声音，不用麦克风
 const lines = {};
 const SPEAKERS = { auto: "自动（中/英）", en: "英语", zh: "中文", ja: "日语", ko: "韩语", fr: "法语", de: "德语", es: "西班牙语" };
-const ASRS = { apple: "苹果自带（最快，边说边出字）", cloud: "云端（Gemini，需要填 key）" };
+const ASRS = { apple: "苹果自带（最快，边说边出字）", local: "本地实时（英语，免费，边说边出字）", cloud: "云端（Gemini，需要填 key）" };
 const ALL_SPEAKERS = { ...SPEAKERS };
-// 苹果识别要事先指定一种语言，做不到「自动（中/英）」；云端识别可以
+// 苹果识别和本地实时都要事先确定语言，做不到「自动（中/英）」；云端识别可以
 function refreshSpeakers() {
   for (const k of Object.keys(SPEAKERS)) delete SPEAKERS[k];
   Object.assign(SPEAKERS, ALL_SPEAKERS);
-  if ($("asr").value === "apple") delete SPEAKERS.auto;
+  if ($("asr").value !== "cloud") delete SPEAKERS.auto; // 只有云端识别能同时认中英文
   fillSelect($("speaker"), SPEAKERS, load("speaker", "en", SPEAKERS));
 }
 const TRANSLATORS = { gemini: "Gemini（推荐，会纠正识别错字）", claude: "Claude（会纠正识别错字）", apple: "苹果自带（免费、本地、直译）" };
@@ -45,7 +45,17 @@ function sendLangs() {
 for (const id of ["speaker", "target", "asr", "translator"])
   $(id).onchange = () => {
     try { localStorage.setItem(id === "asr" ? "asr2" : id, $(id).value); } catch {}
-    if (id === "asr") refreshSpeakers();
+    // 本地实时只支持英语：语言和识别方式互相迁就，免得出一堆乱码
+    if (id === "speaker" && $("asr").value === "local" && $("speaker").value !== "en") {
+      $("asr").value = "cloud";
+      try { localStorage.setItem("asr2", "cloud"); } catch {}
+      toast("本地实时只支持英语，已改用云端识别（需要填 Gemini key）");
+    }
+    if (id === "asr" && $("asr").value === "local" && $("speaker").value !== "en") {
+      try { localStorage.setItem("speaker", "en"); } catch {}
+      toast("本地实时只支持英语，说话人语言已改为英语");
+    }
+    if (id === "asr" || id === "speaker") refreshSpeakers();
     sendLangs();
     if (state !== "idle") toast("已切换，从下一句开始生效");
   };
@@ -393,7 +403,9 @@ $("settingsSave").onclick = async () => {
 apiFetch("/api/app-info").then((r) => r.json()).then((info) => {
   window.APP_INFO = info;
   if (!info.caps.appleAsr) delete ASRS.apple;
+  if (!info.caps.localAsr) delete ASRS.local;
   fillSelect($("asr"), ASRS, load("asr2", Object.keys(ASRS)[0], ASRS));
+  if ($("asr").value === "local" && load("speaker", "en", ALL_SPEAKERS) !== "en") $("asr").value = "cloud"; // 上次选的语言不是英语
   refreshSpeakers();
   for (const el of document.querySelectorAll(".apple-only")) el.hidden = !(info.caps.appleAsr || info.caps.appleTranslate);
   if (!info.caps.appleTranslate) delete TRANSLATORS.apple;
