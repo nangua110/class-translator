@@ -12,7 +12,6 @@
     "helpers": "bash scripts/build-helpers.sh",
     "vendor": "node scripts/vendor.mjs",
     "models": "bash scripts/fetch-models.sh",
-    "sums": "node scripts/sums.mjs",
     "start": "npm run helpers && npm run vendor && npm run models && electron .",
     "dist": "npm run helpers && npm run vendor && npm run models && electron-builder --mac && node scripts/check-package.mjs",
     "dist:win": "npm run vendor && npm run models && electron-builder --win --x64 -c.nsis.useZip=false && electron-builder --win --arm64 && node scripts/check-package.mjs"
