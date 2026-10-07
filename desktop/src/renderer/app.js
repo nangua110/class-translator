@@ -468,6 +468,7 @@ $("settingsSave").onclick = async () => {
 // App：按这台电脑能用的功能调整选项，第一次打开先看隐私说明
 apiFetch("/api/app-info").then((r) => r.json()).then((info) => {
   window.APP_INFO = info;
+  if (info.version) $("ver").textContent = ` · v${info.version}`;
   $("saveAudio").checked = !!info.saveAudio;
   $("keepWrap").hidden = !info.saveAudio;
   $("keepDays").value = String(info.audioKeepDays ?? 7);
