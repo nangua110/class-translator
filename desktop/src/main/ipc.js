@@ -22,7 +22,7 @@ export function registerIpc({ ipcMain, api, makeSession, makeSystemAudio }) {
     session = makeSession(send);
     live.set(wc.id, { session, sys: null, send });
     wc.once("destroyed", () => closeFor(wc.id)); // 关窗口：存盘并杀掉子程序
-    return { record: session.name };
+    return { record: session.name, audio: !!session.recorder };
   });
 
   ipcMain.on("session:audio", (e, data) => {

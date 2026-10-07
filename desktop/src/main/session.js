@@ -10,12 +10,13 @@ const MAX_PARALLEL_TRANSLATIONS = 6;
 
 /** 一节课：收音频 → 苹果识别 → 字幕 → 后台翻译 → 定时更新笔记 → 每句存盘 */
 export class Session {
-  constructor({ send, llm, appleTr, records, caps, makeAsr, sleep, now }) {
+  constructor({ send, llm, appleTr, records, caps, makeAsr, makeRecorder, sleep, now }) {
     Object.assign(this, { send, llm, appleTr, records, caps, makeAsr });
     this.sleep = sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
     this.now = now ?? Date.now;
     this.cfg = { ...DEFAULTS };
     this.name = records.newName();
+    this.recorder = makeRecorder?.(this.name) ?? null; // 开了「保存录音」才有
     this.lines = [];
     this.summary = "";
     this.summarizedUpto = 0;
@@ -77,7 +78,23 @@ export class Session {
     }
     if (!this.asr) this.startAsr(kind);
     this.asr.feed(buf);
+    this.record(buf); // 和下面的计时同步：录音里的第几秒就是字幕上的第几秒
     this.samples += buf.length / 2;
+  }
+
+  record(buf) {
+    if (!this.recorder) return;
+    try {
+      this.recorder.write(buf);
+    } catch (e) { // 磁盘满、没权限：不影响字幕，停止录音并提示一次
+      this.closeRecorder();
+      this.warnOnce("audio", `录音保存失败（${String(e?.message ?? e).slice(0, 60)}），这节课后面的录音不再保存；字幕不受影响`);
+    }
+  }
+  closeRecorder() {
+    const r = this.recorder;
+    this.recorder = null;
+    try { r?.close(); } catch {}
   }
 
   startAsr(kind) {
@@ -225,6 +242,7 @@ export class Session {
 
   /** 结束录制：最后一句确定下来 → 等翻译 → 最终笔记 → 通知窗口 */
   async stop() {
+    this.closeRecorder();
     if (this.asr) { const a = this.asr; this.asr = null; await a.close(); }
     await this.idle();
     await this.updateSummary(true);
@@ -234,6 +252,7 @@ export class Session {
 
   /** 关窗口 / 退出：立刻杀掉子程序并存盘 */
   dispose() {
+    this.closeRecorder();
     if (this.asr) { this.asr.kill(); this.asr = null; }
     this.save();
   }

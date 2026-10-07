@@ -12,7 +12,7 @@ test("保存后能读回转写和列表", () => {
   const r = new Records(tmp());
   r.save(NAME, "笔记", [{ t: 0, text: "Hello", tr: "你好" }, { t: 65, text: "World", tr: "" }, { t: 3909, text: "Bye", tr: "再见" }]);
   assert.deepEqual(r.transcript(NAME), [["00:00:00", "Hello"], ["00:01:05", "World"], ["01:05:09", "Bye"]]);
-  assert.deepEqual(r.list(), [{ name: NAME, stem: "2026-10-07_09-00-00", lines: 3, minutes: 65, hasReport: false, title: "" }]);
+  assert.deepEqual(r.list(), [{ name: NAME, stem: "2026-10-07_09-00-00", lines: 3, minutes: 65, hasReport: false, title: "", hasAudio: false }]);
 });
 
 test("课后精讲：写入后列表显示标题，能读回", () => {

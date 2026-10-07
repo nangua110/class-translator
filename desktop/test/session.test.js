@@ -273,3 +273,42 @@ test("本地实时：把握低的草稿（旁边有人说中文）不显示，�
   asrs[0].emit("message", { type: "partial", text: "Tong Yeminghau, Zing yang", conf: 0.32 });
   assert.deepEqual(sent.filter((m) => m.type === "partial").map((m) => m.text), ["Good morning", ""]);
 });
+
+function withRecorder(recorder) {
+  const sent = [], asrs = [];
+  const s = new Session({
+    send: (m) => sent.push(m),
+    llm: { available: () => ["gemini"], translate: async (t) => `译:${t}`, summarize: async () => "笔记" },
+    appleTr: { translate: async () => ({ tr: "", code: "" }) },
+    records: { newName: () => "2026-10-07_09-00-00.md", save() {} },
+    caps: { appleAsr: true, cloudAsr: true, localAsr: true },
+    makeAsr: (kind, sp, off) => { const a = new FakeAsr(sp, off, kind); asrs.push(a); return a; },
+    makeRecorder: (name) => { recorder.name = name; return recorder; },
+    sleep: async () => {},
+  });
+  s.configure({ speaker: "en", target: "zh", asr: "apple", translator: "gemini" });
+  return { s, sent, asrs };
+}
+
+test("保存录音：写进去的声音和字幕时间对得上（暂停时不写），结束时收尾", async () => {
+  const rec = { bytes: 0, closed: 0, write(b) { this.bytes += b.length; }, close() { this.closed += 1; } };
+  const { s } = withRecorder(rec);
+  s.audio(pcm(2));
+  s.paused = true; s.audio(pcm(5)); s.paused = false;
+  s.audio(pcm(1));
+  assert.equal(rec.name, "2026-10-07_09-00-00.md");
+  assert.equal(rec.bytes, 3 * 32000);
+  assert.equal(rec.bytes / 2, s.samples, "录音长度必须等于字幕计时用的样本数");
+  await s.stop();
+  assert.equal(rec.closed, 1);
+});
+
+test("保存录音：关窗口时也收尾；磁盘写不进去只提示一次，字幕照常", () => {
+  const rec = { closed: 0, write() { throw new Error("ENOSPC"); }, close() { this.closed += 1; } };
+  const { s, sent, asrs } = withRecorder(rec);
+  s.audio(pcm(1)); s.audio(pcm(1));
+  assert.equal(errors(sent).filter((m) => m.includes("录音")).length, 1);
+  assert.equal(asrs[0].fed, 2 * 32000);
+  s.dispose();
+  assert.equal(rec.closed, 1);
+});

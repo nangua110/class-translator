@@ -45,6 +45,9 @@ export class Records {
     return path.join(this.dir, name);
   }
   #reportFile(name) { return path.join(this.dir, name.replace(/\.md$/, REPORT_SUFFIX)); }
+  /** 这节课的原声录音文件（开了「保存录音」才有） */
+  audioFile(name) { return this.#file(name).replace(/\.md$/, ".wav"); }
+  hasAudio(name) { return isValidName(name) && fs.existsSync(path.join(this.dir, name.replace(/\.md$/, ".wav"))); }
   exists(name) { return isValidName(name) && fs.existsSync(path.join(this.dir, name)); }
   save(name, summary, lines) {
     fs.mkdirSync(this.dir, { recursive: true });
@@ -62,7 +65,7 @@ export class Records {
       const [h, m] = lines.at(-1)[0].split(":").map(Number);
       const report = this.readReport(name);
       return [{ name, stem: name.replace(/\.md$/, ""), lines: lines.length, minutes: h * 60 + m,
-        hasReport: !!report, title: report?.title ?? "" }];
+        hasReport: !!report, title: report?.title ?? "", hasAudio: this.hasAudio(name) }];
     });
   }
   readReport(name) {

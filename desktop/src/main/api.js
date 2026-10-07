@@ -2,12 +2,16 @@ import { CLAUDE_MODELS, GEMINI_MODELS, TARGET_LANGS, TRANSLATORS } from "./langs
 import { friendly, simplify } from "./text.js";
 import { isAuthError } from "./llm/errors.js";
 import { reportMarkdown } from "./store/records.js";
+import { readAudioChunk } from "./store/audio.js";
 
 const LABEL = { gemini: "Gemini", claude: "Claude" };
+const KEEP_DAYS = [0, 3, 7, 30];  // 录音保留天数的可选项；0 = 一直保留
+const AUDIO_CHUNK_SEC = 120;     // 播放录音时一次给窗口多长一段
 const safeName = (s) => String(s ?? "课后精讲").replace(/[\\/:*?"<>|]/g, "_").slice(0, 80);
 
 /** 窗口调用的全部接口（与网页版 /api/* 同名同参数，前端改动最小） */
-export function createApi({ settings, llm, appleTr, records, caps, version, openExternal, openPath, askMic, savePdf }) {
+export function createApi({ settings, llm, appleTr, records, caps, version, openExternal, openPath, askMic, savePdf, cleanAudio }) {
+  const audioPrefs = () => ({ saveAudio: !!settings.pref("saveAudio", false), audioKeepDays: settings.pref("audioKeepDays", 7) });
   async function getSettings(q) {
     const src = q.get("src") ?? "en", tgt = q.get("tgt") ?? "zh";
     const translators = { ...TRANSLATORS };
@@ -71,7 +75,16 @@ export function createApi({ settings, llm, appleTr, records, caps, version, open
     const u = new URL(url, "app://local");
     const q = u.searchParams;
     switch (`${method} ${u.pathname}`) {
-      case "GET /api/app-info": return { caps, version, privacyAccepted: settings.pref("privacyAccepted", false) };
+      case "GET /api/app-info": return { caps, version, privacyAccepted: settings.pref("privacyAccepted", false), ...audioPrefs() };
+      case "POST /api/prefs":
+        if (typeof body?.saveAudio === "boolean") settings.setPref("saveAudio", body.saveAudio);
+        if (KEEP_DAYS.includes(body?.audioKeepDays)) { settings.setPref("audioKeepDays", body.audioKeepDays); cleanAudio?.(); }
+        return { ok: true, ...audioPrefs() };
+      case "GET /api/audio": { // 从第 t 秒起的一小段原声
+        const name = q.get("record");
+        const chunk = records.hasAudio(name) ? readAudioChunk(records.audioFile(name), Number(q.get("t")) || 0, AUDIO_CHUNK_SEC) : null;
+        return chunk ? { ok: true, ...chunk } : { ok: false };
+      }
       case "POST /api/privacy-accepted":
         settings.setPref("privacyAccepted", true);
         try { records.ensureDir(); } catch {} // 让系统的「文稿」权限询问在这时弹出，而不是上课中途
@@ -79,7 +92,7 @@ export function createApi({ settings, llm, appleTr, records, caps, version, open
       case "POST /api/mic-access": return { granted: await askMic() };
       case "GET /api/settings": return getSettings(q);
       case "POST /api/settings": return saveSettings(body);
-      case "GET /api/records": return records.list().map((r) => ({ ...r, has_report: r.hasReport })); // 界面沿用网页版字段名
+      case "GET /api/records": return records.list().map((r) => ({ ...r, has_report: r.hasReport, has_audio: r.hasAudio })); // 界面沿用网页版字段名
       case "GET /api/report": {
         const r = records.readReport(q.get("record"));
         return r ? { ok: true, ...r } : { ok: false };

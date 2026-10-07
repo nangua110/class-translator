@@ -17,6 +17,7 @@ import { savePdf } from "./pdf.js";
 import { VoiceDetector } from "./cloud/vad.js";
 import { CloudASR } from "./cloud/asr.js";
 import { LocalASR } from "./local/asr.js";
+import { AudioRecorder, cleanOldAudio } from "./store/audio.js";
 
 const here = import.meta.dirname;
 app.setName("课堂同传");
@@ -36,8 +37,13 @@ function build() {
   const vadReady = VoiceDetector.load(path.join(here, "../../assets/silero_vad.onnx"));
   vadReady.catch((e) => console.error("人声检测模型加载失败", e));
   const vad = { hasVoice: async (f32) => (await vadReady).hasVoice(f32) };
+  // 原声录音：默认不存；开了以后和课堂记录放在一起，超过保留天数自动删
+  const cleanAudio = () => { try { cleanOldAudio(records.dir, settings.pref("audioKeepDays", 7)); } catch {} };
+  cleanAudio();
+  setInterval(cleanAudio, 6 * 3600_000).unref();
   const makeSession = (send) => new Session({
     send, llm, appleTr, records, caps,
+    makeRecorder: (name) => (settings.pref("saveAudio", false) || process.env.CT_SMOKE_AUDIO ? new AudioRecorder(records.audioFile(name)) : null),
     makeAsr: (kind, speaker, offset) => {
       if (kind === "cloud") return new CloudASR({ llm, vad, speaker, offset });
       if (kind === "local") return new LocalASR({ workerPath: localWorker, modelDir, speaker, offset });
@@ -45,7 +51,7 @@ function build() {
     },
   });
   const api = createApi({
-    settings, llm, appleTr, records, caps, version: app.getVersion(),
+    settings, llm, appleTr, records, caps, version: app.getVersion(), cleanAudio,
     openExternal: (u) => shell.openExternal(u),
     openPath: (p) => { fs.mkdirSync(p, { recursive: true }); return shell.openPath(p); },
     askMic: () => (process.platform === "darwin" ? systemPreferences.askForMediaAccess("microphone") : Promise.resolve(true)),

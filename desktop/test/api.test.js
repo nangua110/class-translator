@@ -124,3 +124,29 @@ test("点「我知道了」时先建好记录文件夹，让系统的文稿权�
   await api("/api/privacy-accepted", "POST");
   assert.equal(fs.existsSync(records.dir), true);
 });
+
+test("录音设置：默认不保存、保留 7 天；能改，乱填的值不收", async () => {
+  const { api, settings } = setup();
+  const info = await api("/api/app-info", "GET");
+  assert.equal(info.saveAudio, false);
+  assert.equal(info.audioKeepDays, 7);
+  assert.deepEqual(await api("/api/prefs", "POST", { saveAudio: true, audioKeepDays: 30 }), { ok: true, saveAudio: true, audioKeepDays: 30 });
+  await api("/api/prefs", "POST", { audioKeepDays: 9999 });
+  await api("/api/prefs", "POST", { audioKeepDays: "abc" });
+  assert.equal(settings.pref("audioKeepDays"), 30);
+  assert.equal((await api("/api/app-info", "GET")).saveAudio, true);
+});
+
+test("取录音片段：有录音的课能取，没有的 / 名字不合法的都拒绝；列表标出有没有录音", async () => {
+  const { api, records } = setup();
+  records.save(NAME, "", lines3);
+  assert.equal((await api("/api/records", "GET"))[0].has_audio, false);
+  fs.writeFileSync(records.audioFile(NAME), Buffer.concat([Buffer.alloc(44), Buffer.alloc(32000 * 5)]));
+  assert.equal((await api("/api/records", "GET"))[0].has_audio, true);
+  const r = await api(`/api/audio?record=${NAME}&t=2`, "GET");
+  assert.equal(r.ok, true);
+  assert.equal(r.total, 5);
+  assert.equal(r.wav.length, 44 + 3 * 32000);
+  assert.deepEqual(await api("/api/audio?record=../../secret.md&t=0", "GET"), { ok: false });
+  assert.deepEqual(await api("/api/audio?record=2026-10-08_09-00-00.md&t=0", "GET"), { ok: false });
+});

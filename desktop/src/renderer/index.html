@@ -44,6 +44,13 @@
   .line { display: grid; grid-template-columns: 64px 1fr; gap: 12px; padding: 12px 0;
     border-bottom: 1px solid var(--line); }
   .line .t { color: var(--accent); font-variant-numeric: tabular-nums; font-size: 13px; padding-top: 2px; }
+  .line .t.play, .ts { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+  .ts { color: var(--accent); }
+  .check { display: flex; align-items: center; gap: 4px; }
+  .player { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px;
+    background: #fff; border-radius: 14px; padding: 8px 14px; box-shadow: 0 6px 24px rgba(0,0,0,.18); font-size: 13px; z-index: 5; }
+  .player[hidden] { display: none; }
+  .player audio { height: 32px; width: 300px; }
   .line .en { margin: 0; }
   .line .zh { margin: 4px 0 0; color: var(--zh); }
   .lang { font-size: 13px; font-weight: 400; color: var(--muted); display: flex; align-items: center; gap: 6px; }
@@ -131,6 +138,8 @@
   <label>识别方式 <select id="asr"></select></label>
   <label>翻译 <select id="translator"></select></label>
   <label>麦克风 <select id="mic"></select></label>
+  <label class="check" title="把这节课的原声存在这台电脑上，之后点字幕的时间就能回听"><input type="checkbox" id="saveAudio"> 保存录音</label>
+  <label id="keepWrap" hidden>自动清理 <select id="keepDays"></select></label>
   <button id="settingsBtn">AI 模型与 API</button>
 </header>
 <main>
@@ -165,6 +174,7 @@
     <div class="scroll" id="report" hidden><div class="empty">点「结束录制」后，会自动把整节课整理成课后精讲：<br>章节大纲、AI 精讲、术语表、思考题和核心要点</div></div>
   </section>
 </main>
+<div class="player" id="player" hidden><span id="playerText"></span><audio id="audio" controls></audio><button id="playerClose" title="关闭">关闭</button></div>
 <div class="toast" id="toast"></div>
 <dialog id="privacy">
   <h3>使用前请看一下</h3>
@@ -172,6 +182,7 @@
     <table class="privacy">
       <tr class="apple-only"><td>苹果识别、苹果翻译</td><td>只在这台电脑上处理，不上传</td></tr>
       <tr><td>本地实时识别</td><td>只在这台电脑上处理，不上传</td></tr>
+      <tr><td>保存录音（默认关闭）</td><td>只存在这台电脑的课堂记录文件夹里，到期自动删除，不上传</td></tr>
       <tr><td>云端识别（Gemini）</td><td>有人说话的音频片段会发送给 Google</td></tr>
       <tr><td>Gemini 翻译、课堂笔记、课后精讲</td><td>转写的文字会发送给 Google</td></tr>
       <tr><td>Claude 翻译、课堂笔记、课后精讲</td><td>转写的文字会发送给 Anthropic</td></tr>

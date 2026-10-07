@@ -14,7 +14,7 @@ function setup(makeSession) {
 test("每条消息都带上所属课的标识，窗口能分清是哪节课的", async () => {
   const { open, sent } = setup((send) => ({ name: "a.md", configure() {}, dispose() {}, send, start() { send({ type: "line" }); } }));
   const r = await open();
-  assert.deepEqual(r, { record: "a.md" });
+  assert.deepEqual(r, { record: "a.md", audio: false });
 });
 
 test("消息带 sid；结束时出错也一定发 done，窗口不会卡在收尾", async () => {

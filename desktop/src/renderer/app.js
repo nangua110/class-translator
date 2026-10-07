@@ -85,6 +85,7 @@ function setState(s) {
   $("stopBtn").disabled = s === "idle";
   $("sumBtn").disabled = s === "idle";
   $("mic").disabled = s !== "idle";
+  $("saveAudio").disabled = s !== "idle"; // 录到一半不能改
   $("dot").classList.toggle("on", s === "recording");
   if (s === "idle") renderLive("");
 }
@@ -108,6 +109,7 @@ async function listMics() {
 }
 
 function addLine({ id, t, text, tr, same }) {
+  const record = ws?.audio ? ws.sid : "";
   $("empty")?.remove();
   const el = document.createElement("div");
   el.className = "line";
@@ -116,6 +118,11 @@ function addLine({ id, t, text, tr, same }) {
   const zh = el.querySelector(".zh");
   if (same) { zh.textContent = "（原话）"; zh.classList.add("tag"); zh.classList.remove("wait"); }
   else if (tr) { zh.textContent = tr; zh.classList.remove("wait"); }
+  if (record) { // 这节课在保存录音：点时间就从这一句回听
+    const tEl = el.querySelector(".t");
+    tEl.classList.add("play"); tEl.title = "点击回听这一句";
+    tEl.onclick = () => playAt(record, Math.max(0, t - 0.5));
+  }
   lines[id] = el;
   const box = $("transcript");
   const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
@@ -235,6 +242,64 @@ function showTab(t) {
 }
 for (const b of document.querySelectorAll(".tab")) b.onclick = () => showTab(b.dataset.tab);
 
+// ---------- 回听原声：开了「保存录音」的课，点字幕或课后精讲里的时间就从那里播放 ----------
+const KEEP_DAYS = { 3: "3 天后", 7: "7 天后", 30: "30 天后", 0: "不清理" };
+let playing = null; // {record, start, url}
+async function playAt(record, t) {
+  let d;
+  try { d = await (await apiFetch(`/api/audio?record=${encodeURIComponent(record)}&t=${t}`)).json(); } catch { d = { ok: false }; }
+  if (!d.ok) { closePlayer(); return toast("这节课没有保存录音，或者录音已经被自动清理了"); }
+  if (playing?.url) URL.revokeObjectURL(playing.url);
+  playing = { record, start: d.start, total: d.total, url: URL.createObjectURL(new Blob([d.wav], { type: "audio/wav" })) };
+  $("playerText").textContent = `回听 ${fmt(d.start)} 起`;
+  $("player").hidden = false;
+  $("audio").src = playing.url;
+  $("audio").play().catch(() => {});
+}
+function closePlayer() {
+  $("audio").pause();
+  $("audio").removeAttribute("src");
+  if (playing?.url) URL.revokeObjectURL(playing.url);
+  playing = null;
+  $("player").hidden = true;
+}
+$("playerClose").onclick = closePlayer;
+// 一次只取两分钟，播完自动接下一段
+$("audio").onended = () => {
+  if (!playing) return;
+  const next = playing.start + $("audio").duration;
+  if (Number.isFinite(next) && next < playing.total - 0.5) playAt(playing.record, next); else closePlayer();
+};
+// 把课后精讲里的 00:12:34 变成可以点的时间（只有这节课存了录音才变）
+function linkTimes(root, record) {
+  if (!records.find((x) => x.name === record)?.has_audio) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) if (/\d\d:\d\d:\d\d/.test(walker.currentNode.nodeValue)) nodes.push(walker.currentNode);
+  for (const node of nodes) {
+    const frag = document.createDocumentFragment();
+    for (const part of node.nodeValue.split(/(\d\d:\d\d:\d\d)/)) {
+      if (!/^\d\d:\d\d:\d\d$/.test(part)) { frag.append(part); continue; }
+      const a = document.createElement("span");
+      a.className = "ts"; a.textContent = part; a.title = "点击回听";
+      const [h, m, s] = part.split(":").map(Number);
+      a.onclick = () => playAt(record, h * 3600 + m * 60 + s);
+      frag.append(a);
+    }
+    node.replaceWith(frag);
+  }
+}
+async function savePrefs(body) {
+  try { await apiFetch("/api/prefs", { method: "POST", body: JSON.stringify(body) }); } catch { toast("设置没保存上"); }
+}
+fillSelect($("keepDays"), KEEP_DAYS, "7");
+$("saveAudio").onchange = () => {
+  $("keepWrap").hidden = !$("saveAudio").checked;
+  savePrefs({ saveAudio: $("saveAudio").checked });
+  if ($("saveAudio").checked) toast("之后的课会保存原声录音，只存在这台电脑上，到期自动清理");
+};
+$("keepDays").onchange = () => savePrefs({ audioKeepDays: Number($("keepDays").value) });
+
 function recordLabel(r) {
   const m = r.stem.match(/^\d{4}-(\d\d)-(\d\d)_(\d\d)-(\d\d)/);
   const when = m ? `${m[1]}-${m[2]} ${m[3]}:${m[4]}` : r.stem;
@@ -242,7 +307,7 @@ function recordLabel(r) {
 }
 function setReportView(md, title) {
   reportMd = md || ""; reportTitle = title || "课后精讲";
-  if (md) $("report").innerHTML = md2html(md);
+  if (md) { $("report").innerHTML = md2html(md); linkTimes($("report"), $("histSel").value); }
   else { $("report").innerHTML = '<div class="empty"></div>'; $("report").firstChild.textContent = REPORT_EMPTY; }
   $("pdfBtn").disabled = !md;
   if (tab === "report") $("exportBtn").disabled = !md;
@@ -403,6 +468,9 @@ $("settingsSave").onclick = async () => {
 // App：按这台电脑能用的功能调整选项，第一次打开先看隐私说明
 apiFetch("/api/app-info").then((r) => r.json()).then((info) => {
   window.APP_INFO = info;
+  $("saveAudio").checked = !!info.saveAudio;
+  $("keepWrap").hidden = !info.saveAudio;
+  $("keepDays").value = String(info.audioKeepDays ?? 7);
   if (!info.caps.appleAsr) delete ASRS.apple;
   if (!info.caps.localAsr) delete ASRS.local;
   fillSelect($("asr"), ASRS, load("asr2", Object.keys(ASRS)[0], ASRS));
