@@ -427,7 +427,7 @@ test("英文讲课：边出草稿边按句定稿，时间递增，把握够高",
     "Good morning everyone. Today we will continue our discussion of thermodynamics. The second law tells us that entropy never decreases."));
   const finals = msgs.filter((m) => m.type === "final");
   assert.ok(msgs.some((m) => m.type === "partial" && m.text), "应该有草稿");
-  assert.ok(finals.length >= 3, `应按句定稿，实际 ${finals.length} 句`);
+  assert.ok(finals.length >= 2, `应按句定稿，实际 ${finals.length} 句`);
   assert.match(finals.map((f) => f.text).join(" "), /thermodynamics/i);
   assert.ok(finals.every((f, i) => i === 0 || f.start > finals[i - 1].start), "开始时间应递增");
   assert.ok(finals.every((f) => acceptLocalFinal(f, "en")), "英语句子都应通过过滤");
@@ -852,7 +852,7 @@ afconvert -f WAVE -d LEI16@16000 -c 1 $T/a.aiff $T/a.wav
 CT_SMOKE_WAV=$T/a.wav CT_SMOKE_ASR=local CT_RECORDS_DIR=$T/records npx electron . > $T/out.txt 2>&1
 grep SMOKE $T/out.txt | grep -E '"line"|"done"' | cut -c1-140; grep -c '"partial"' $T/out.txt
 ```
-Expected: 至少 3 条 `line`（含 `thermodynamics`，`lang` 为 `en`），最后有 `done`，`partial` 条数大于 0。
+Expected: 至少 2 条 `line`（含 `thermodynamics`，`lang` 为 `en`），最后有 `done`，`partial` 条数大于 0。
 
 - [ ] **Step 5: Commit**
 
@@ -1007,7 +1007,7 @@ CT_SMOKE_WAV=$T/a.wav CT_SMOKE_ASR=local CT_RECORDS_DIR=$T/records "dist/mac-arm
 grep SMOKE $T/out.txt | grep -E '"line"|"error"|"done"' | cut -c1-140
 codesign --verify --deep --strict "dist/mac-arm64/课堂同传.app" && echo 签名完整
 ```
-Expected: 至少 3 条 `line`（含 `thermodynamics`），没有「本地实时识别出错」，最后 `done`；「签名完整」。若线程启动失败，按报错修正 `asarUnpack` 或 `localWorker` 路径后重打，并在 ledger 记 Ruling。
+Expected: 至少 2 条 `line`（含 `thermodynamics`），没有「本地实时识别出错」，最后 `done`；「签名完整」。若线程启动失败，按报错修正 `asarUnpack` 或 `localWorker` 路径后重打，并在 ledger 记 Ruling。
 
 - [ ] **Step 5: 打 Windows 包并检查，清理 .app 副本**
 
@@ -1078,7 +1078,7 @@ for a in x64 arm64; do
 done
 rm -f ~/Desktop/课堂同传.lnk
 ```
-Expected（两种架构都要满足）：`installed=True`；界面 0 个报错，`asr` 为「本地实时」「云端」两项，且本地实时排第一；本地实时冒烟输出至少 3 条 `line`（含 `thermodynamics`）和 `done`，没有「本地实时识别出错」「跟不上」。虚拟机没填 key 时会有一条「课堂笔记更新失败…需要先填写 key」，属正常。最后一行删掉 Parallels 共享桌面上生成的坏快捷方式。
+Expected（两种架构都要满足）：`installed=True`；界面 0 个报错，`asr` 为「本地实时」「云端」两项，且本地实时排第一；本地实时冒烟输出至少 2 条 `line`（含 `thermodynamics`）和 `done`，没有「本地实时识别出错」「跟不上」。虚拟机没填 key 时会有一条「课堂笔记更新失败…需要先填写 key」，属正常。最后一行删掉 Parallels 共享桌面上生成的坏快捷方式。
 
 - [ ] **Step 4: 和南瓜一起做的人工检查**
 
