@@ -8,6 +8,7 @@ files:
   - src/**
   - assets/silero_vad.onnx
   - assets/SILERO_LICENSE.txt
+  - assets/THIRD_PARTY_NOTICES.md
   # onnxruntime-web 只带实际用到的 4 个文件（整个包 130 多 MB）
   - "!node_modules/onnxruntime-web/dist/**"
   - node_modules/onnxruntime-web/dist/ort.node.min.js
@@ -17,6 +18,11 @@ files:
 asar: true
 asarUnpack:
   - node_modules/onnxruntime-web/dist/**   # WebAssembly 文件放在压缩包外，按文件路径加载更可靠
+  - node_modules/sherpa-onnx/**            # 本地实时识别的 WASM 运行库
+  - src/main/local/**                      # 后台线程脚本要按真实文件路径启动
+extraResources:
+  - from: models                           # 本地实时识别模型（scripts/fetch-models.sh 下载，不进 git）
+    to: models
 mac:
   target:
     - target: dmg

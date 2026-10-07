@@ -29,8 +29,16 @@ const resourceDirs = fs.readdirSync(dist).flatMap((d) => {
 }).filter((r) => fs.existsSync(path.join(r, "app.asar")));
 if (!resourceDirs.length) throw new Error("dist 里没有找到打好的 App");
 
-const MUST_HAVE = ["assets/silero_vad.onnx", "node_modules/onnxruntime-web/dist/ort.node.min.js"];
-const MUST_UNPACKED = "app.asar.unpacked/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm";
+const MUST_HAVE = ["assets/silero_vad.onnx", "assets/THIRD_PARTY_NOTICES.md", "node_modules/onnxruntime-web/dist/ort.node.min.js"];
+// 必须以真实文件存在（不能只在 asar 里）：WASM、后台线程脚本、本地识别模型
+const MUST_FILES = [
+  "app.asar.unpacked/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm",
+  "app.asar.unpacked/node_modules/sherpa-onnx/sherpa-onnx-wasm-nodejs.wasm",
+  "app.asar.unpacked/src/main/local/worker.cjs",
+  "app.asar.unpacked/src/main/local/sentences.js",
+  "models/kroko-en/encoder.onnx",
+  "models/kroko-en/tokens.txt",
+];
 for (const res of resourceDirs) {
   walk(res);
   const archive = path.join(res, "app.asar");
@@ -48,7 +56,7 @@ for (const res of resourceDirs) {
     }
   }
   for (const need of MUST_HAVE) if (!listed.includes(need)) problems.push(`缺少必需文件：${need}（${res}）`);
-  if (!fs.existsSync(path.join(res, MUST_UNPACKED))) problems.push(`缺少人声检测运行文件：${MUST_UNPACKED}（${res}）`);
+  for (const f of MUST_FILES) if (!fs.existsSync(path.join(res, f))) problems.push(`缺少必需文件：${f}（${res}）`);
   const ortFiles = listed.filter((f) => f.startsWith("node_modules/onnxruntime-web/dist/") && f.split("/").length === 4);
   if (ortFiles.length > 4) problems.push(`onnxruntime-web 多带了文件：${ortFiles.length} 个（${res}）`);
 }
