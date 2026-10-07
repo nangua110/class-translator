@@ -204,7 +204,7 @@ test("acceptLocalFinal：把握低（别的语言）丢掉；英语保留并清�
   assert.equal(acceptLocalFinal({ text: "Tong Yeminghau, Zing yang womanianli.", conf: 0.3, start: 1 }, "en"), null);
   assert.deepEqual(acceptLocalFinal({ text: " The second law. ", conf: 0.72, start: 4.5 }, "en"), { text: "The second law.", lang: "en", start: 4.5 });
   assert.equal(acceptLocalFinal({ text: "Thank you.", conf: 0.9, start: 0 }, "en"), null, "常见胡编句丢掉");
-  assert.equal(acceptLocalFinal({ text: "Okay.", conf: -1, start: 0 }, "en").text, "Okay.", "没有把握值时不按把握过滤");
+  assert.equal(acceptLocalFinal({ text: "Open the book.", conf: -1, start: 0 }, "en").text, "Open the book.", "没有把握值时不按把握过滤");
   assert.equal(acceptLocalFinal({ text: "Hello there.", conf: 0.9, start: 0 }, "zh"), null, "本地实时只出英语");
 });
 ```
