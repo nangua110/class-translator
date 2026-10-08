@@ -4,11 +4,13 @@ import { FAST_MODELS, SUMMARY_MODELS } from "../langs.js";
 import { NoKey, withTimeout } from "./errors.js";
 import { GeminiPool, orderModels } from "./gemini.js";
 import { askClaude } from "./claude.js";
+import { OpenAICompat, isLocalBase } from "./openai.js";
 import { TRANSLATE_SYSTEM, SUMMARY_SYSTEM, REPORT_OUTLINE_SYSTEM, REPORT_BODY_SYSTEM, RECOGNIZE_SYSTEM, RECOGNIZE_SCHEMA } from "./prompts.js";
 
 const DEFAULT_FACTORIES = {
   gemini: (apiKey) => new GoogleGenAI({ apiKey }),
   claude: (apiKey) => new Anthropic({ apiKey, maxRetries: 1 }),
+  openai: (opts) => new OpenAICompat(opts),
 };
 
 export function parseJson(text) {
@@ -28,8 +30,12 @@ export class LLM {
     const g = this.settings.getKey("gemini"), c = this.settings.getKey("claude");
     this.gemini = g ? new GeminiPool(this.factories.gemini(g)) : null;
     this.claude = c ? this.factories.claude(c) : null;
+    // 其他模型（OpenAI 兼容接口）：要有接口地址和模型名；key 只有本地模型可以不填
+    const base = this.settings.pref("openaiBase", ""), o = this.settings.getKey("openai");
+    const ready = base && this.settings.pref("openaiModel", "") && (o || isLocalBase(base));
+    this.openai = ready ? this.factories.openai({ base, apiKey: o }) : null;
   }
-  available() { return [this.gemini && "gemini", this.claude && "claude"].filter(Boolean); }
+  available() { return [this.gemini && "gemini", this.claude && "claude", this.openai && "openai"].filter(Boolean); }
 
   async ask(provider, { system, prompt, effort, maxTokens, timeoutMs, json = false }) {
     if (provider === "gemini") {
@@ -43,6 +49,10 @@ export class LLM {
       if (!this.claude) throw new NoKey("还没填写 Claude 的 API key");
       const model = this.settings.pref("claudeModel", "claude-opus-5-5");
       return withTimeout(askClaude(this.claude, model, { system, prompt, effort, maxTokens }), timeoutMs);
+    }
+    if (provider === "openai") {
+      if (!this.openai) throw new NoKey("还没填好「其他模型」的接口地址、模型名和 key");
+      return this.openai.chat({ model: this.settings.pref("openaiModel", ""), system, prompt, timeoutMs });
     }
     throw new Error(`未知的服务：${provider}`);
   }

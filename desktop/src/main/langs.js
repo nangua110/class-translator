@@ -1,8 +1,17 @@
 // 网页上可选的语言、翻译方式、模型等常量（与网页版 server.py / llm.py 保持一致）
 export const SPEAKER_LANGS = { auto: "自动（中/英）", en: "英语", zh: "中文", ja: "日语", ko: "韩语", fr: "法语", de: "德语", es: "西班牙语" };
 export const TARGET_LANGS = { zh: "简体中文", en: "英语", ja: "日语", ko: "韩语", fr: "法语", de: "德语", es: "西班牙语" };
-// Gemini / Claude 会结合上文纠正识别错字；苹果自带是本地直译，只做备用
-export const TRANSLATORS = { gemini: "Gemini（推荐，会纠正识别错字）", claude: "Claude（会纠正识别错字）", apple: "苹果自带（免费、本地、直译）" };
+// AI 模型会结合上文纠正识别错字；苹果自带是本地直译，只做备用
+export const TRANSLATORS = { gemini: "Gemini（推荐，会纠正识别错字）", claude: "Claude（会纠正识别错字）", openai: "其他模型（DeepSeek、OpenAI 等）", apple: "苹果自带（免费、本地、直译）" };
+export const PROVIDER_LABELS = { gemini: "Gemini", claude: "Claude", openai: "其他模型" };
+// 「其他模型」的常用服务商：选了就自动填好接口地址和推荐的模型名，都可以再改
+export const OPENAI_PRESETS = {
+  deepseek: { label: "DeepSeek", base: "https://api.deepseek.com/v1", model: "deepseek-flash", hint: "在 DeepSeek 开放平台申请 key（按用量付费）。" },
+  openai: { label: "OpenAI", base: "https://api.openai.com/v1", model: "gpt-5.4-mini", hint: "在 OpenAI 平台申请 key（按用量付费）。" },
+  openrouter: { label: "OpenRouter（一个 key 用多家模型）", base: "https://openrouter.ai/api/v1", model: "deepseek/deepseek-v4.1-flash", hint: "在 OpenRouter 申请 key，模型名要带上厂商前缀。" },
+  ollama: { label: "本地 Ollama（不联网，不用 key）", base: "http://localhost:11434/v1", model: "qwen3:8b", hint: "先在这台电脑上装好 Ollama 并下载模型，模型名填你下载的那个；不用填 key。" },
+  custom: { label: "自定义", base: "", model: "", hint: "填服务商给的 OpenAI 兼容接口地址（一般以 /v1 结尾）、模型名和 key。" },
+};
 export const APPLE_LOCALES = { auto: "en-US", en: "en-US", zh: "zh-CN", ja: "ja-JP", ko: "ko-KR", fr: "fr-FR", de: "de-DE", es: "es-ES" };
 export const APPLE_TR_LANGS = { en: "en", zh: "zh-Hans", ja: "ja", ko: "ko", fr: "fr", de: "de", es: "es" };
 export const CLAUDE_MODELS = {

@@ -1,7 +1,7 @@
 {
   "name": "class-translator",
   "productName": "课堂同传",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "课堂实时字幕与翻译",
   "author": "南瓜",
   "license": "MIT",

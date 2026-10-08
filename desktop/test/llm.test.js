@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { GeminiPool, orderModels } from "../src/main/llm/gemini.js";
 import { askClaude } from "../src/main/llm/claude.js";
 import { LLM, parseJson } from "../src/main/llm/index.js";
-import { NoKey, AllModelsBusy } from "../src/main/llm/errors.js";
+import { NoKey, AllModelsBusy, TimeoutError } from "../src/main/llm/errors.js";
+import { OpenAICompat, normalizeBase, checkBase, isLocalBase } from "../src/main/llm/openai.js";
+import { friendly } from "../src/main/text.js";
 
 const err = (status, message) => Object.assign(new Error(message), { status });
 function fakeGemini(behave = {}) {
@@ -125,4 +127,80 @@ test("模型都因为超时 / 服务器忙在冷却：报的是「网络慢」�
   const quota = new GeminiPool(fakeGemini({ a: err(429, "PerDay"), b: err(429, "PerDay") }), () => 0);
   await assert.rejects(quota.generate(["a", "b"], {}, 20));
   assert.equal((await quota.generate(["a", "b"], {}, 20).catch((x) => x)).quota, true);
+});
+
+// ---------- 其他模型（OpenAI 兼容接口） ----------
+function fakeFetch(reply) {
+  const calls = [];
+  const fn = async (url, init) => {
+    calls.push({ url, headers: init.headers, body: JSON.parse(init.body) });
+    const r = typeof reply === "function" ? reply() : reply;
+    if (r instanceof Error) throw r;
+    return { ok: r.status === undefined || r.status < 400, status: r.status ?? 200, text: async () => JSON.stringify(r.body) };
+  };
+  return Object.assign(fn, { calls });
+}
+const said = (content) => ({ body: { choices: [{ message: { content } }] } });
+
+test("接口地址：去掉多余的斜杠和路径；远程地址必须加密，本机可以不加密", () => {
+  assert.equal(normalizeBase(" https://api.example.com/v1/ "), "https://api.example.com/v1");
+  assert.equal(normalizeBase("https://api.example.com/v1/chat/completions"), "https://api.example.com/v1");
+  assert.equal(checkBase("https://api.example.com/v1"), "");
+  assert.equal(checkBase("http://localhost:11434/v1"), "");
+  assert.equal(checkBase("http://127.0.0.1:1234/v1"), "");
+  assert.match(checkBase("http://api.example.com/v1"), /https/);
+  assert.match(checkBase("随便写的"), /地址/);
+  assert.equal(isLocalBase("http://localhost:11434/v1"), true);
+  assert.equal(isLocalBase("https://api.example.com/v1"), false);
+});
+
+test("其他模型：按 OpenAI 格式发请求，key 只放在请求头里", async () => {
+  const f = fakeFetch(said(" 你好 "));
+  const c = new OpenAICompat({ base: "https://api.example.com/v1", apiKey: "sk-test-1234567890", fetch: f });
+  assert.equal(await c.chat({ model: "m1", system: "系统", prompt: "hello", timeoutMs: 1000 }), "你好");
+  assert.equal(f.calls[0].url, "https://api.example.com/v1/chat/completions");
+  assert.equal(f.calls[0].headers.Authorization, "Bearer sk-test-1234567890");
+  assert.deepEqual(f.calls[0].body, { model: "m1", messages: [{ role: "system", content: "系统" }, { role: "user", content: "hello" }], stream: false });
+});
+
+test("其他模型：本地模型不带 key；去掉模型输出里的思考过程", async () => {
+  const f = fakeFetch(said("<think>先想一想</think>\n译文"));
+  const c = new OpenAICompat({ base: "http://localhost:11434/v1", apiKey: "", fetch: f });
+  assert.equal(await c.chat({ model: "m", system: "s", prompt: "p", timeoutMs: 1000 }), "译文");
+  assert.equal("Authorization" in f.calls[0].headers, false);
+});
+
+test("其他模型：报错带上状态码和服务商的说明，不带 key；连不上、超时、空回复都说清楚", async () => {
+  const mk = (reply) => new OpenAICompat({ base: "https://api.example.com/v1", apiKey: "sk-secret-1234567890", fetch: fakeFetch(reply) });
+  const ask = (c, timeoutMs = 1000) => c.chat({ model: "m", system: "s", prompt: "p", timeoutMs });
+  const e = await ask(mk({ status: 401, body: { error: { message: "Incorrect API key" } } })).catch((x) => x);
+  assert.equal(e.status, 401);
+  assert.match(e.message, /401 Incorrect API key/);
+  assert.equal(e.message.includes("sk-secret"), false);
+  assert.equal(friendly(e), "API key 无效");
+  assert.match(friendly(await ask(mk({ status: 404, body: { error: "model not found" } })).catch((x) => x)), /接口地址或模型名不对/);
+  assert.match(friendly(await ask(mk({ status: 402, body: { error: { message: "Insufficient Balance" } } })).catch((x) => x)), /余额不足/);
+  assert.match(friendly(await ask(mk(new TypeError("fetch failed"))).catch((x) => x)), /连不上/);
+  await assert.rejects(ask(mk(said(""))), /没有返回内容/);
+  const hang = new OpenAICompat({ base: "https://api.example.com/v1", apiKey: "k", fetch: () => new Promise(() => {}) });
+  await assert.rejects(ask(hang, 30), TimeoutError);
+});
+
+function fakeSettings(prefs = {}, keys = {}) {
+  return { getKey: (p) => keys[p] ?? "", pref: (k, d) => prefs[k] ?? d };
+}
+test("LLM：填了接口地址、模型名和 key 才算可用；本地模型不用 key；翻译照样带上文", async () => {
+  const made = [];
+  const factories = { gemini: () => ({}), claude: () => ({}), openai: (o) => { made.push(o); return { chat: async (r) => { made.push(r); return "译文"; } }; } };
+  assert.deepEqual(new LLM(fakeSettings({ openaiBase: "https://api.example.com/v1", openaiModel: "m" }), factories).available(), []);
+  assert.deepEqual(new LLM(fakeSettings({ openaiBase: "http://localhost:11434/v1", openaiModel: "m" }), factories).available(), ["openai"]);
+  await assert.rejects(new LLM(fakeSettings(), factories).translate("hi", [], "简体中文", "openai"), NoKey);
+  made.length = 0;
+  const llm = new LLM(fakeSettings({ openaiBase: "https://api.example.com/v1", openaiModel: "m9" }, { openai: "sk-test-1234567890" }), factories);
+  assert.deepEqual(llm.available(), ["openai"]);
+  assert.equal(await llm.translate("当前", ["一", "二", "三", "四"], "简体中文", "openai"), "译文");
+  assert.deepEqual(made[0], { base: "https://api.example.com/v1", apiKey: "sk-test-1234567890" });
+  assert.equal(made[1].model, "m9");
+  assert.match(made[1].system, /同声传译/);
+  assert.equal(made[1].prompt, "【上文】\n二\n三\n四\n\n【当前句】\n当前");
 });

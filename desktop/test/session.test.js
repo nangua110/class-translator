@@ -349,3 +349,23 @@ test("课堂笔记只增不改：每次只整理新讲的内容并接在后面�
   await s.updateSummary(true); // 没有新内容：不再请求，也不改笔记
   assert.equal(seen.length, 3);
 });
+
+test("选了「其他模型」：用它翻译；地址或模型名不对时不反复重试，改用苹果翻译并说明是哪家用不了", async () => {
+  const used = [];
+  const ok = setup({ llm: { available: () => ["openai"], translate: async (t, _c, _l, p) => { used.push(p); return `译:${t}`; } } });
+  ok.s.configure({ translator: "openai" });
+  ok.s.audio(pcm(1));
+  ok.asrs[0].emit("message", final("Hello there."));
+  await ok.s.idle();
+  assert.deepEqual(used, ["openai"]);
+
+  let tries = 0;
+  const bad = setup({ llm: { available: () => ["openai"], translate: async () => { tries += 1; throw Object.assign(new Error("404 model not found"), { status: 404 }); } } });
+  bad.s.configure({ translator: "openai" });
+  bad.s.audio(pcm(1));
+  bad.asrs[0].emit("message", final("Hello there."));
+  await bad.s.idle();
+  assert.equal(tries, 1);
+  assert.equal(bad.sent.find((m) => m.type === "translation").tr, "苹果译");
+  assert.match(errors(bad.sent)[0], /其他模型 用不了（接口地址或模型名不对）/);
+});

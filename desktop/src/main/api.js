@@ -1,12 +1,13 @@
-import { CLAUDE_MODELS, GEMINI_MODELS, TARGET_LANGS, TRANSLATORS } from "./langs.js";
+import { CLAUDE_MODELS, GEMINI_MODELS, OPENAI_PRESETS, PROVIDER_LABELS as LABEL, TARGET_LANGS, TRANSLATORS } from "./langs.js";
 import { friendly, simplify } from "./text.js";
-import { isAuthError } from "./llm/errors.js";
+import { isAuthError, TimeoutError } from "./llm/errors.js";
+import { checkBase, isLocalBase, normalizeBase } from "./llm/openai.js";
 import { reportMarkdown } from "./store/records.js";
 import fs from "node:fs";
 import { RELEASES } from "./update.js";
 import { isRecordingTo, listAudio, readAudioChunk } from "./store/audio.js";
 
-const LABEL = { gemini: "Gemini", claude: "Claude" };
+const TRANSIENT = [429, 500, 502, 503, 504, 529]; // 限流、服务器忙：配置本身没问题
 const KEEP_DAYS = [0, 3, 7, 30];  // 录音保留天数的可选项；0 = 一直保留
 const AUDIO_CHUNK_SEC = 120;     // 播放录音时一次给窗口多长一段
 const safeName = (s) => String(s ?? "课后精讲").replace(/[\\/:*?"<>|]/g, "_").slice(0, 80);
@@ -14,6 +15,44 @@ const safeName = (s) => String(s ?? "课后精讲").replace(/[\\/:*?"<>|]/g, "_"
 /** 窗口调用的全部接口（与网页版 /api/* 同名同参数，前端改动最小） */
 export function createApi({ settings, llm, appleTr, records, caps, version, openExternal, openPath, askMic, savePdf, cleanAudio, checkUpdate }) {
   const audioPrefs = () => ({ saveAudio: !!settings.pref("saveAudio", false), audioKeepDays: settings.pref("audioKeepDays", 7) });
+  const openaiConfig = () => ({ preset: settings.pref("openaiPreset", "deepseek"), base: settings.pref("openaiBase", ""), model: settings.pref("openaiModel", "") });
+  /** 其他模型（OpenAI 兼容接口）：窗口只在用户动过这一栏时才带上这些字段。没问题返回 null */
+  async function saveOpenai(b, notes) {
+    const touched = ["openai_preset", "openai_base", "openai_model", "openai_key"].some((k) => typeof b[k] === "string");
+    if (!touched) { if (b.clear_openai_key) settings.clearKey("openai"); return null; }
+    const old = { ...openaiConfig(), key: settings.getKey("openai") };
+    const next = {
+      preset: b.openai_preset in OPENAI_PRESETS ? b.openai_preset : old.preset,
+      base: typeof b.openai_base === "string" ? normalizeBase(b.openai_base) : old.base,
+      model: typeof b.openai_model === "string" ? b.openai_model.trim().slice(0, 200) : old.model,
+      key: b.clear_openai_key ? "" : String(b.openai_key ?? "").trim() || old.key,
+    };
+    if (Object.keys(next).every((k) => next[k] === old[k])) return null;
+    if (!next.base) return { ok: false, msg: "「其他模型」还要填接口地址" };
+    const bad = checkBase(next.base);
+    if (bad) return { ok: false, msg: bad };
+    if (!next.model) return { ok: false, msg: "「其他模型」还要填模型名" };
+    if (!next.key && !isLocalBase(next.base)) return { ok: false, msg: "「其他模型」还要填 key（只有这台电脑上的本地模型不用填）" };
+    const apply = (c) => {
+      if (c.key) settings.setKey("openai", c.key); else settings.clearKey("openai");
+      settings.setPref("openaiPreset", c.preset); settings.setPref("openaiBase", c.base); settings.setPref("openaiModel", c.model);
+      llm.configure();
+    };
+    try { apply(next); } catch (e) { return { ok: false, msg: e.message }; }
+    try {
+      await llm.testKey("openai");
+    } catch (e) {
+      if (e instanceof TimeoutError || TRANSIENT.includes(e?.status)) {
+        notes.push(`其他模型已保存（测试时${friendly(e)}，可能要过一会儿才能用）`);
+        return null;
+      }
+      if (old.base) apply(old); // 恢复原来的；以前没填过就清空
+      else { settings.clearKey("openai"); for (const k of ["openaiPreset", "openaiBase", "openaiModel"]) settings.setPref(k, undefined); llm.configure(); }
+      return { ok: false, msg: `其他模型不能用：${friendly(e)}` };
+    }
+    return null;
+  }
+
   async function getSettings(q) {
     const src = q.get("src") ?? "en", tgt = q.get("tgt") ?? "zh";
     const translators = { ...TRANSLATORS };
@@ -22,6 +61,7 @@ export function createApi({ settings, llm, appleTr, records, caps, version, open
       gemini: settings.keyState("gemini"), claude: settings.keyState("claude"),
       gemini_model: settings.pref("geminiModel", "auto"), gemini_models: GEMINI_MODELS,
       claude_model: settings.pref("claudeModel", "claude-opus-5-5"), claude_models: CLAUDE_MODELS,
+      openai: { ...settings.keyState("openai"), ...openaiConfig() }, openai_presets: OPENAI_PRESETS,
       translators,
       apple: caps.appleTranslate ? await appleTr.status(src, tgt) : "unsupported",
     };
@@ -49,8 +89,10 @@ export function createApi({ settings, llm, appleTr, records, caps, version, open
         notes.push(`${LABEL[p]} 的 key 已保存（测试时${friendly(e)}，不影响使用）`);
       }
     }
+    const failed = await saveOpenai(b, notes);
+    if (failed) return failed;
     llm.configure();
-    return { ok: true, msg: notes.join("；") };
+    return { ok: true, msg: notes.join("；"), available: llm.available() }; // available：现在哪几家能用，窗口据此帮用户选翻译方式
   }
 
   async function makeReport(b = {}) {
@@ -60,7 +102,7 @@ export function createApi({ settings, llm, appleTr, records, caps, version, open
     if (lines.length < 3) return { ok: false, msg: "这节课内容太少，不用生成课后精讲" };
     const avail = llm.available();
     const provider = avail.includes(b.translator) ? b.translator : avail[0];
-    if (!provider) return { ok: false, msg: "要生成课后精讲，需要先在「AI 模型与 API」里填写 Gemini 或 Claude 的 key" };
+    if (!provider) return { ok: false, msg: "要生成课后精讲，需要先在「AI 模型与 API」里填好一个 AI 模型的 key" };
     const target = b.target in TARGET_LANGS ? b.target : "zh";
     const transcript = lines.map(([t, text]) => `[${t}] ${text}`).join("\n");
     try {

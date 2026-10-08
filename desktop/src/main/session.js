@@ -1,8 +1,8 @@
-import { TARGET_LANGS, TRANSLATORS, SPEAKER_LANGS, SR, SUMMARY_CONTEXT_CHARS, SUMMARY_INTERVAL_MS, SUMMARY_RETRY_MS } from "./langs.js";
+import { PROVIDER_LABELS, TARGET_LANGS, TRANSLATORS, SPEAKER_LANGS, SR, SUMMARY_CONTEXT_CHARS, SUMMARY_INTERVAL_MS, SUMMARY_RETRY_MS } from "./langs.js";
 import { simplify, friendly, fmtTs } from "./text.js";
 import { acceptFinal, acceptPartial } from "./apple/filter.js";
 import { acceptCloudFinal } from "./cloud/filter.js";
-import { AllModelsBusy, NoKey } from "./llm/errors.js";
+import { AllModelsBusy, NoKey, isAuthError } from "./llm/errors.js";
 import { acceptLocalFinal, LOCAL_MIN_CONF } from "./local/filter.js";
 
 const DEFAULTS = { speaker: "en", target: "zh", asr: "apple", translator: "gemini" };
@@ -181,6 +181,7 @@ export class Session {
         } catch (e) {
           err = e;
           if (e instanceof AllModelsBusy || e instanceof NoKey || String(e?.message).includes("PerDay")) break;
+          if (isAuthError(e) || [402, 404].includes(e?.status)) break; // key、地址或模型名不对，余额不足：再试也没用
         }
       }
     }
@@ -188,7 +189,7 @@ export class Session {
     if (tr) {
       if (err && !this.fallbackNoted) {
         this.fallbackNoted = true;
-        const who = this.cfg.translator === "claude" ? "Claude" : "Gemini";
+        const who = PROVIDER_LABELS[this.cfg.translator] ?? "AI 翻译";
         this.send({ type: "error", msg: `${who} 用不了（${friendly(err)}），先改用苹果翻译顶上（直译，不会纠正识别错字）` });
       }
       return tr;
@@ -207,7 +208,7 @@ export class Session {
     const avail = this.llm.available();
     if (avail.includes(this.cfg.translator)) return this.cfg.translator;
     if (avail.length) return avail[0];
-    throw new NoKey("要生成课堂笔记，需要先在「AI 模型与 API」里填写 Gemini 或 Claude 的 key");
+    throw new NoKey("要生成课堂笔记，需要先在「AI 模型与 API」里填好一个 AI 模型的 key");
   }
 
   async updateSummary(final = false) {

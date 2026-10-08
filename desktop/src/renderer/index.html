@@ -109,9 +109,14 @@
   dialog .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
   dialog .state { font-size: 13px; color: var(--muted); }
   dialog .state.ok { color: #16a34a; }
-  dialog input[type=password] { width: 100%; font: inherit; padding: 8px 12px; border-radius: 10px;
+  dialog input[type=password], dialog input[type=text] { width: 100%; font: inherit; padding: 8px 12px; border-radius: 10px;
     border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+  dialog .field { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; }
+  dialog .field span { flex: none; width: 4.5em; font-size: 13px; color: var(--muted); }
+  dialog .field select, dialog .field input { flex: 1; min-width: 0; }
+  dialog .field select { font: inherit; padding: 6px 8px; }
   dialog .hint { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+  dialog .err { font-size: 14px; color: var(--red); margin: 12px 0 0; }
   dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
   dialog [hidden] { display: none !important; }
   .audio-list { max-height: 50vh; overflow-y: auto; }
@@ -198,6 +203,7 @@
       <tr><td>云端识别（Gemini）</td><td>有人说话的音频片段会发送给 Google</td></tr>
       <tr><td>Gemini 翻译、课堂笔记、课后精讲</td><td>转写的文字会发送给 Google</td></tr>
       <tr><td>Claude 翻译、课堂笔记、课后精讲</td><td>转写的文字会发送给 Anthropic</td></tr>
+      <tr><td>其他模型翻译、课堂笔记、课后精讲</td><td>转写的文字会发送给你自己填的那家服务商；本地模型不上传</td></tr>
       <tr><td>检查更新</td><td>打开 App 时向 GitHub 查询最新版本号，不发送任何个人信息</td></tr>
       <tr><td>南瓜（作者）</td><td>收不到任何数据：App 里没有统计、没有上传</td></tr>
     </table>
@@ -240,9 +246,21 @@
     <p class="hint">模型 <select id="claudeModel"></select></p>
   </section>
   <section>
+    <div class="row"><b>其他模型</b><span class="state" id="openaiState"></span></div>
+    <label class="field"><span>服务商</span><select id="openaiPreset"></select></label>
+    <label class="field"><span>接口地址</span><input type="text" id="openaiBase" placeholder="比如 https://…/v1" autocomplete="off" spellcheck="false"></label>
+    <label class="field"><span>模型名</span><input type="text" id="openaiModel" placeholder="服务商文档里写的模型名" autocomplete="off" spellcheck="false"></label>
+    <div class="saved" id="openaiSaved"><span class="mask" id="openaiMask"></span>
+      <button type="button" id="openaiEdit">修改</button><button type="button" class="del" id="openaiDel">删除</button></div>
+    <input type="password" id="openaiKey" placeholder="粘贴 API key" autocomplete="off">
+    <p class="hint" id="openaiHint"></p>
+    <p class="hint">支持 OpenAI 兼容接口的模型都能用，可用于翻译和 AI 总结（云端识别仍然要用 Gemini）。转写的文字会发送到上面的接口地址。
+      本地模型和带「思考」的模型比较慢，可能跟不上实时翻译。</p>
+  </section>
+  <section>
     <div class="row"><b>苹果自带翻译</b><span class="state" id="appleState"></span></div>
-    <p class="hint">免费、本地、不限量，不用填 key；但只是直译，不会像 Gemini / Claude 那样结合上文纠正识别错字。
-      选了 Gemini / Claude 时，额度用完会自动用它顶上。<br>第一次用要先下载语言：系统设置 → 通用 → 语言与地区 → 翻译语言。</p>
+    <p class="hint">免费、本地、不限量，不用填 key；但只是直译，不会像 AI 模型那样结合上文纠正识别错字。
+      选了 AI 模型时，额度用完或出错会自动用它顶上。<br>第一次用要先下载语言：系统设置 → 通用 → 语言与地区 → 翻译语言。</p>
     <p><button id="openTr" type="button">打开系统设置下载语言</button></p>
   </section>
   <section>
@@ -251,6 +269,7 @@
     <p><button id="openRecords" type="button">打开记录文件夹</button></p>
   </section>
   <p class="hint">key 用系统加密保存在这台电脑上，界面上只显示末尾 4 位。</p>
+  <p class="err" id="settingsErr" hidden></p>
   <div class="actions"><button id="settingsCancel" type="button">取消</button>
     <button class="primary" id="settingsSave" type="button">保存</button></div>
 </dialog>

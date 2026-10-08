@@ -19,7 +19,7 @@ function refreshSpeakers() {
   if ($("asr").value !== "cloud") delete SPEAKERS.auto; // 只有云端识别能同时认中英文
   fillSelect($("speaker"), SPEAKERS, load("speaker", "en", SPEAKERS));
 }
-const TRANSLATORS = { gemini: "Gemini（推荐，会纠正识别错字）", claude: "Claude（会纠正识别错字）", apple: "苹果自带（免费、本地、直译）" };
+const TRANSLATORS = { gemini: "Gemini（推荐，会纠正识别错字）", claude: "Claude（会纠正识别错字）", openai: "其他模型（DeepSeek、OpenAI 等）", apple: "苹果自带（免费、本地、直译）" };
 const TARGETS = { zh: "简体中文", en: "英语", ja: "日语", ko: "韩语", fr: "法语", de: "德语", es: "西班牙语" };
 
 // 语言选择：记住上次的选择，录音中途切换也会立即生效
@@ -457,6 +457,7 @@ $("exportBtn").onclick = () => {
 
 // ---------- AI 模型与 API：key（修改 / 删除）、模型、苹果翻译 ----------
 // 每家 key 的编辑状态：keep 保持不变 / edit 正在填新的 / remove 保存后删除
+const PROVIDERS = ["gemini", "claude", "openai"];
 const keyMode = {};
 function showKey(p, k, mode) {
   keyMode[p] = mode;
@@ -472,13 +473,38 @@ function showKey(p, k, mode) {
   if (mode === "edit") { input.value = ""; input.placeholder = k.set ? "粘贴新的 key（取消则保留原来的）" : input.placeholder; input.focus(); }
 }
 let keys = {};
+// 其他模型（OpenAI 兼容接口）：选了服务商就填好接口地址和推荐的模型名；动过这一栏，保存时才提交
+let presets = {}, openaiDirty = false;
+function showPreset(fill) {
+  const p = presets[$("openaiPreset").value] || {};
+  if (fill) { $("openaiBase").value = p.base; $("openaiModel").value = p.model; }
+  $("openaiHint").textContent = p.hint || "";
+}
+// 这台电脑上的本地模型不用 key：提示换一下，已经配好的显示「已可用」
+function showLocal() {
+  const local = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test($("openaiBase").value.trim());
+  $("openaiKey").placeholder = local ? "本地模型不用填 key" : "粘贴 API key";
+  if (keys.openai?.set || keyMode.openai !== "keep") return;
+  const ready = local && !openaiDirty && keys.openai?.base;
+  $("openaiState").textContent = ready ? "已可用（不用 key）" : "未填写";
+  $("openaiState").classList.toggle("ok", !!ready);
+}
+$("openaiPreset").onchange = () => { openaiDirty = true; showPreset(true); showLocal(); };
+for (const id of ["openaiBase", "openaiModel", "openaiKey"]) $(id).oninput = () => { openaiDirty = true; showLocal(); };
 async function openSettings() {
   const src = $("speaker").value === "auto" ? "en" : $("speaker").value;
   let st;
   try { st = await (await apiFetch(`/api/settings?src=${src}&tgt=${$("target").value}`)).json(); }
   catch { return toast("连不上本地服务，打不开"); }
-  keys = { gemini: st.gemini, claude: st.claude };
-  for (const p of ["gemini", "claude"]) { $(p + "Key").value = ""; showKey(p, keys[p], "keep"); }
+  keys = { gemini: st.gemini, claude: st.claude, openai: st.openai };
+  for (const p of PROVIDERS) { $(p + "Key").value = ""; showKey(p, keys[p], "keep"); }
+  presets = st.openai_presets;
+  fillSelect($("openaiPreset"), Object.fromEntries(Object.entries(presets).map(([k, v]) => [k, v.label])), st.openai.preset);
+  showPreset(!st.openai.base); // 以前没填过：先填上这家的默认值
+  if (st.openai.base) { $("openaiBase").value = st.openai.base; $("openaiModel").value = st.openai.model; }
+  openaiDirty = false;
+  showLocal();
+  $("settingsErr").hidden = true;
   fillSelect($("geminiModel"), st.gemini_models, st.gemini_model);
   fillSelect($("claudeModel"), st.claude_models, st.claude_model);
   const pair = `${SPEAKERS[src]} → ${TARGETS[$("target").value]}`;
@@ -486,9 +512,15 @@ async function openSettings() {
   $("appleState").classList.toggle("ok", st.apple === "installed");
   $("settings").showModal();
 }
-for (const p of ["gemini", "claude"]) {
+for (const p of PROVIDERS) {
   $(p + "Edit").onclick = () => showKey(p, keys[p], "edit");
   $(p + "Del").onclick = () => showKey(p, keys[p], keyMode[p] === "remove" ? "keep" : "remove");
+}
+// 保存失败的原因写在弹窗里：底部的提示条会被弹窗挡住
+function settingsError(msg) {
+  const el = $("settingsErr");
+  el.textContent = msg; el.hidden = false;
+  el.scrollIntoView({ block: "nearest" });
 }
 $("settingsBtn").onclick = openSettings;
 $("settingsCancel").onclick = () => $("settings").close();
@@ -500,16 +532,29 @@ $("settingsSave").onclick = async () => {
     if (keyMode[p] === "remove") body[`clear_${p}_key`] = true;
     else body[`${p}_key`] = $(p + "Key").value; // 空着就是不修改
   }
+  if (keyMode.openai === "remove") body.clear_openai_key = true;
+  if (openaiDirty) Object.assign(body, { openai_preset: $("openaiPreset").value, openai_base: $("openaiBase").value,
+    openai_model: $("openaiModel").value, openai_key: $("openaiKey").value });
   const btn = $("settingsSave");
+  $("settingsErr").hidden = true;
   btn.disabled = true; btn.textContent = "正在测试 key…"; // 测试要联网，可能要等几秒到十几秒
   try {
     const r = await (await apiFetch("/api/settings", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     })).json();
-    if (!r.ok) return toast(r.msg || "保存失败");
+    if (!r.ok) return settingsError(r.msg || "保存失败");
     $("settings").close();
-    toast(r.msg || "已保存，马上生效");
-  } catch { toast("保存失败：连不上本地服务"); }
+    // 选着的翻译方式还没填 key，而别的已经能用：直接换过去，免得白填
+    const cur = $("translator").value, usable = (r.available || []).filter((p) => p in TRANSLATORS);
+    let switched = "";
+    if (cur !== "apple" && usable.length && !usable.includes(cur)) {
+      $("translator").value = usable[0];
+      try { localStorage.setItem("translator", usable[0]); } catch {}
+      sendLangs();
+      switched = `已保存，翻译方式已改为「${TRANSLATORS[usable[0]]}」`;
+    }
+    toast(r.msg || switched || "已保存，马上生效");
+  } catch { settingsError("保存失败：连不上本地服务"); }
   finally { btn.disabled = false; btn.textContent = "保存"; }
 };
 

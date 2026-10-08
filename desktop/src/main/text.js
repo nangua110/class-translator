@@ -53,6 +53,9 @@ export function friendly(err) {
   if ((err instanceof AllModelsBusy && err.quota) || msg.includes("PerDay")) return "Gemini 今天的免费额度用完了";
   if (err instanceof AllModelsBusy) return "Gemini 服务器忙或网络太慢";
   if (err instanceof TimeoutError) return "响应超时";
+  if (err?.unreachable) return "连不上接口地址，请检查地址和网络";
+  if (err?.status === 402 || /insufficient.{0,20}(balance|quota|credit)/i.test(msg)) return "账户余额不足";
+  if (err?.status === 404) return "接口地址或模型名不对";
   if (msg.includes("429")) return "请求太频繁，被限流了";
   if (/503|UNAVAILABLE|overloaded/i.test(msg)) return "服务器繁忙";
   if (/API key|401|403|invalid x-api-key|authentication/i.test(msg)) return "API key 无效";

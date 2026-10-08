@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const KEY_RE = /^[\w\-.]{10,300}$/;
-const PROVIDERS = ["gemini", "claude"];
+const PROVIDERS = ["gemini", "claude", "openai"];
 
 /** 偏好存普通 JSON；API key 用系统加密（Mac 钥匙串 / Windows DPAPI）后再存，绝不存明文 */
 export class Settings {

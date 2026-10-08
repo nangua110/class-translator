@@ -59,7 +59,7 @@ test("生成课后精讲：转简体、保存、可再读回", async () => {
 test("没填 key 时生成精讲给出提示", async () => {
   const { api, records } = setup();
   records.save(NAME, "", lines3);
-  assert.match((await api("/api/report", "POST", { record: NAME })).msg, /需要先在「AI 模型与 API」里填写/);
+  assert.match((await api("/api/report", "POST", { record: NAME })).msg, /需要先在「AI 模型与 API」里填好/);
 });
 
 test("设置：返回的数据里没有完整 key", async () => {
@@ -184,4 +184,66 @@ test("更新：检查有没有新版、打开下载页", async () => {
   assert.deepEqual(await api("/api/update-check", "POST"), { current: "0.1.0", latest: "9.9.9" });
   await api("/api/update-page", "POST");
   assert.deepEqual(calls, [["open", "https://github.com/nangua110/class-translator/releases/latest"]]);
+});
+
+// ---------- 其他模型（OpenAI 兼容接口） ----------
+const OKEY = "sk-other-1234567890";
+const OTHER = { openai_preset: "custom", openai_base: "https://api.example.com/v1/", openai_model: " m1 ", openai_key: OKEY };
+const saved = (s) => [s.pref("openaiPreset"), s.pref("openaiBase"), s.pref("openaiModel"), s.getKey("openai")];
+
+test("其他模型：保存前先测试，地址去掉多余的斜杠；设置里只给 key 的末 4 位", async () => {
+  const tested = [];
+  const { api, settings } = setup({ testKey: async (p) => { tested.push(p); return "ok"; } });
+  assert.deepEqual(await api("/api/settings", "POST", OTHER), { ok: true, msg: "", available: [] });
+  assert.deepEqual(tested, ["openai"]);
+  assert.deepEqual(saved(settings), ["custom", "https://api.example.com/v1", "m1", OKEY]);
+  const st = await api("/api/settings?src=en&tgt=zh", "GET");
+  assert.deepEqual(st.openai, { set: true, tail: "7890", preset: "custom", base: "https://api.example.com/v1", model: "m1" });
+  assert.equal(st.openai_presets.deepseek.label, "DeepSeek");
+  assert.equal(JSON.stringify(st).includes(OKEY), false);
+  await api("/api/settings", "POST", { ...OTHER, openai_key: "" }); // 什么都没改：不再测试
+  assert.equal(tested.length, 1);
+});
+
+test("其他模型：没动过这一栏就不保存也不测试", async () => {
+  const tested = [];
+  const { api, settings } = setup({ testKey: async (p) => { tested.push(p); } });
+  assert.equal((await api("/api/settings", "POST", { gemini_model: "auto" })).ok, true);
+  assert.deepEqual([tested, settings.pref("openaiBase")], [[], undefined]);
+});
+
+test("其他模型：地址、模型名、key 缺了或不对都说清楚，什么都不保存", async () => {
+  const { api, settings } = setup();
+  assert.match((await api("/api/settings", "POST", { ...OTHER, openai_base: "" })).msg, /接口地址/);
+  assert.match((await api("/api/settings", "POST", { ...OTHER, openai_base: "http://api.example.com/v1" })).msg, /https/);
+  assert.match((await api("/api/settings", "POST", { ...OTHER, openai_model: "" })).msg, /模型名/);
+  assert.match((await api("/api/settings", "POST", { ...OTHER, openai_key: "" })).msg, /key/);
+  assert.match((await api("/api/settings", "POST", { ...OTHER, openai_key: "有 空格" })).msg, /格式不对/);
+  assert.deepEqual(saved(settings), [undefined, undefined, undefined, ""]);
+});
+
+test("其他模型：测试不通过就恢复原来的；只是限流 / 超时照样保存", async () => {
+  let fail = null;
+  const { api, settings } = setup({ testKey: async () => { if (fail) throw fail; } });
+  await api("/api/settings", "POST", OTHER);
+  fail = Object.assign(new Error("404 model not found"), { status: 404 });
+  const r = await api("/api/settings", "POST", { openai_preset: "deepseek", openai_base: "https://api.example.com/v2", openai_model: "m2", openai_key: "sk-new-1234567890" });
+  assert.equal(r.ok, false);
+  assert.match(r.msg, /其他模型不能用：接口地址或模型名不对/);
+  assert.deepEqual(saved(settings), ["custom", "https://api.example.com/v1", "m1", OKEY]);
+  fail = Object.assign(new Error("429 rate limit"), { status: 429 });
+  const r2 = await api("/api/settings", "POST", { openai_preset: "custom", openai_base: "https://api.example.com/v1", openai_model: "m3", openai_key: "" });
+  assert.equal(r2.ok, true);
+  assert.match(r2.msg, /已保存/);
+  assert.equal(settings.pref("openaiModel"), "m3");
+});
+
+test("其他模型：本地模型不用 key；删除 key", async () => {
+  const { api, settings } = setup();
+  assert.equal((await api("/api/settings", "POST", { openai_preset: "ollama", openai_base: "http://localhost:11434/v1", openai_model: "qwen3:8b", openai_key: "" })).ok, true);
+  assert.deepEqual(saved(settings), ["ollama", "http://localhost:11434/v1", "qwen3:8b", ""]);
+  await api("/api/settings", "POST", OTHER);
+  assert.equal((await api("/api/settings", "POST", { clear_openai_key: true })).ok, true);
+  assert.equal(settings.getKey("openai"), "");
+  assert.equal(settings.pref("openaiBase"), "https://api.example.com/v1");
 });
