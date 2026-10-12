@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { LocalASR } from "../src/main/local/asr.js";
-import { acceptLocalFinal, LOCAL_MIN_CONF } from "../src/main/local/filter.js";
+import { acceptLocalFinal } from "../src/main/local/filter.js";
 
 const modelDir = path.resolve("models/kroko-en");
 const workerPath = path.resolve("src/main/local/worker.cjs");
@@ -49,12 +49,10 @@ test("说完马上结束：最后一个词也要识别出来", { skip, timeout: 
   assert.match(text, /Friday/i, text);
 });
 
-test("旁边有人说中文：定稿的句子把握很低，全部被过滤掉", { skip, timeout: 120_000 }, async () => {
+test("旁边有人说中文：定稿的句子把握很低，全部标成可能听错", { skip, timeout: 120_000 }, async () => {
   const msgs = await recognize(speech("Tingting", "同学们好，今天我们讲热力学第二定律，熵总是增加的。下课以后记得交作业。"));
   const finals = msgs.filter((m) => m.type === "final");
-  assert.deepEqual(finals.filter((f) => acceptLocalFinal(f, "en")), [], JSON.stringify(finals.map((f) => [f.text, f.conf])));
-  const shown = msgs.filter((m) => m.type === "partial" && m.text && !(m.conf >= 0 && m.conf < LOCAL_MIN_CONF));
-  assert.ok(shown.length <= 2, "乱码草稿大多应被隐藏：" + JSON.stringify(shown.map((m) => [m.text, m.conf])));
+  assert.deepEqual(finals.map((f) => acceptLocalFinal(f, "en")).filter((r) => r && !r.low), [], JSON.stringify(finals.map((f) => [f.text, f.conf])));
 });
 
 test("模型目录不存在：提示出错并 exit 1，不会卡住", { timeout: 60_000 }, async () => {

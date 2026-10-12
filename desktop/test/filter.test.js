@@ -2,8 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { acceptFinal, acceptPartial } from "../src/main/apple/filter.js";
 
-test("说的不是所选语言（把握低的拼音乱码）丢掉", () => {
-  assert.equal(acceptFinal({ text: "Hong Shiemen Hao, Xin Tian woman", conf: 0.24, start: 1 }, "en"), null);
+test("把握低的句子不丢，标成可能听错（老师小声说话和别的语言的乱码分不开）", () => {
+  assert.deepEqual(acceptFinal({ text: "Let me see if I have one.", conf: 0.24, start: 1 }, "en"),
+    { text: "Let me see if I have one.", lang: "en", start: 1, low: true });
+  assert.equal("low" in acceptFinal({ text: "Don't worry.", conf: 0.5, start: 1 }, "en"), false);
+  assert.equal(acceptFinal({ text: "你好", conf: 0.2, start: 1 }, "en"), null, "文字明显不是所选语言的仍然丢掉");
 });
 test("所选语言正常保留，带上开始时间", () => {
   assert.deepEqual(acceptFinal({ text: "Today we talk.", conf: 0.95, start: 1.5 }, "en"),

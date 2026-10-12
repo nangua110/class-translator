@@ -52,8 +52,8 @@ test("reset 后从新的一段重新开始", () => {
   assert.deepEqual(r.finals.map((f) => [f.text, f.start]), [["New segment.", 30]]);
 });
 
-test("acceptLocalFinal：把握低（别的语言）丢掉；英语保留并清理", () => {
-  assert.equal(acceptLocalFinal({ text: "Tong Yeminghau, Zing yang womanianli.", conf: 0.3, start: 1 }, "en"), null);
+test("acceptLocalFinal：把握低的不丢，标成可能听错；英语保留并清理", () => {
+  assert.deepEqual(acceptLocalFinal({ text: "Why thirty eight?", conf: 0.3, start: 1 }, "en"), { text: "Why thirty eight?", lang: "en", start: 1, low: true });
   assert.deepEqual(acceptLocalFinal({ text: " The second law. ", conf: 0.72, start: 4.5 }, "en"), { text: "The second law.", lang: "en", start: 4.5 });
   assert.equal(acceptLocalFinal({ text: "Thank you.", conf: 0.9, start: 0 }, "en"), null, "常见胡编句丢掉");
   assert.equal(acceptLocalFinal({ text: "Open the book.", conf: -1, start: 0 }, "en").text, "Open the book.", "没有把握值时不按把握过滤");

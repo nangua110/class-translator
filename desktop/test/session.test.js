@@ -45,12 +45,13 @@ test("确定句 → 字幕 + 后台翻译 + 存盘；草稿照发", async () => 
   assert.ok(saved.length >= 2);
 });
 
-test("其他语言的乱码不出字幕", async () => {
+test("把握低的句子照样出字幕，标成可能听错；文字明显不是所选语言的仍然不出", async () => {
   const { s, sent, asrs } = setup();
   s.audio(pcm(1));
-  asrs[0].emit("message", final("Hong Shiemen Hao, Xin Tian woman", 0.24));
+  asrs[0].emit("message", final("Let me see if I have one.", 0.24));
+  asrs[0].emit("message", final("你好同学们", 0.24, 3));
   await s.idle();
-  assert.equal(sent.filter((m) => m.type === "line").length, 0);
+  assert.deepEqual(sent.filter((m) => m.type === "line").map((m) => [m.text, m.low]), [["Let me see if I have one.", true]]);
 });
 
 test("中途换说话人语言：关掉旧识别，新识别从当前时间算起", () => {
@@ -226,13 +227,15 @@ test("本地实时：草稿照发，定稿直接出字幕并按所选方式带�
   assert.deepEqual(asked.find((a) => a.t === "Entropy never decreases.").ctx, ["The second law."]);
 });
 
-test("本地实时：把握低的句子（旁边有人说中文）不出字幕", async () => {
+test("本地实时：把握低的句子照样出字幕和翻译，标成可能听错", async () => {
   const { s, sent, asrs } = setup();
   s.configure({ asr: "local" });
   s.audio(pcm(1));
-  asrs[0].emit("message", { type: "final", source: "local", text: "Tong Yeminghau, Zing yang womanianli.", conf: 0.3, start: 0 });
+  asrs[0].emit("message", { type: "final", source: "local", text: "Why thirty eight?", conf: 0.3, start: 0 });
+  asrs[0].emit("message", { type: "final", source: "local", text: "Because I put it.", conf: 0.8, start: 2 });
   await s.idle();
-  assert.equal(sent.filter((m) => m.type === "line").length, 0);
+  assert.deepEqual(sent.filter((m) => m.type === "line").map((m) => [m.text, !!m.low]), [["Why thirty eight?", true], ["Because I put it.", false]]);
+  assert.equal(sent.filter((m) => m.type === "translation").length, 2);
 });
 
 test("本地实时只支持英语：说话人语言选了别的，只提示一次，不启动识别", () => {
@@ -266,13 +269,13 @@ test("一种识别方式出错停掉后，换另一种还能用", () => {
   assert.equal(asrs[2].kind, "cloud");
 });
 
-test("本地实时：把握低的草稿（旁边有人说中文）不显示，并清掉之前的草稿", () => {
+test("本地实时：把握低的草稿也显示", () => {
   const { s, sent, asrs } = setup();
   s.configure({ asr: "local" });
   s.audio(pcm(1));
   asrs[0].emit("message", { type: "partial", text: "Good morning", conf: 0.75 });
   asrs[0].emit("message", { type: "partial", text: "Tong Yeminghau, Zing yang", conf: 0.32 });
-  assert.deepEqual(sent.filter((m) => m.type === "partial").map((m) => m.text), ["Good morning", ""]);
+  assert.deepEqual(sent.filter((m) => m.type === "partial").map((m) => m.text), ["Good morning", "Tong Yeminghau, Zing yang"]);
 });
 
 function withRecorder(recorder) {

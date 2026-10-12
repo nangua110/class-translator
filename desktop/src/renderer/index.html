@@ -52,6 +52,7 @@
   .player[hidden] { display: none; }
   .player audio { height: 32px; width: 300px; }
   .line .en { margin: 0; }
+  .line.low .en, .line.low .zh { color: var(--muted); } /* 识别把握低、可能听错的句子 */
   .line .zh { margin: 4px 0 0; color: var(--zh); }
   .lang { font-size: 13px; font-weight: 400; color: var(--muted); display: flex; align-items: center; gap: 6px; }
   .lang select { padding: 4px 8px; font-size: 14px; }

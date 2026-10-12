@@ -3,7 +3,7 @@ import { simplify, friendly, fmtTs } from "./text.js";
 import { acceptFinal, acceptPartial } from "./apple/filter.js";
 import { acceptCloudFinal } from "./cloud/filter.js";
 import { AllModelsBusy, NoKey, isAuthError } from "./llm/errors.js";
-import { acceptLocalFinal, LOCAL_MIN_CONF } from "./local/filter.js";
+import { acceptLocalFinal } from "./local/filter.js";
 
 const DEFAULTS = { speaker: "en", target: "zh", asr: "apple", translator: "gemini" };
 const MAX_PARALLEL_TRANSLATIONS = 6;
@@ -115,20 +115,18 @@ export class Session {
   }
 
   onAsr(asr, m) {
-    if (m.type === "partial" && asr.kind === "local" && m.conf >= 0 && m.conf < LOCAL_MIN_CONF) {
-      this.send({ type: "partial", text: "" }); // 把握很低：多半是旁边有人在说别的语言，乱码草稿不显示
-    } else if (m.type === "partial") {
+    if (m.type === "partial") {
       if (acceptPartial(m.text ?? "", asr.speaker)) this.send({ type: "partial", text: m.text });
     } else if (m.type === "final" && m.source === "local") {
       const r = acceptLocalFinal(m, asr.speaker);
-      if (r) this.addLine(r.text, r.lang, "", asr.offset + r.start);
+      if (r) this.addLine(r.text, r.lang, "", asr.offset + r.start, r.low);
     } else if (m.type === "final" && m.source === "cloud") {
       const r = acceptCloudFinal(m, asr.speaker);
       if (r) this.addLine(r.text, r.lang, "", asr.offset + r.start); // 翻译统一走 translateLine：带上文、按所选方式
     } else if (m.type === "final") {
       this.send({ type: "partial", text: "" });
       const r = acceptFinal(m, asr.speaker);
-      if (r) this.addLine(r.text, r.lang, "", asr.offset + r.start);
+      if (r) this.addLine(r.text, r.lang, "", asr.offset + r.start, r.low);
     } else if (m.type === "status") {
       this.send({ type: "status", recognizing: !!m.recognizing });
     } else if (m.type === "downloading") {
@@ -138,13 +136,14 @@ export class Session {
     }
   }
 
-  /** 新增一句字幕：去重、推给窗口、需要的话后台翻译 */
-  addLine(text, lang, tr, t) {
+  /** 新增一句字幕：去重、推给窗口、需要的话后台翻译。low 表示识别把握低、可能听错（界面上用浅色） */
+  addLine(text, lang, tr, t, low = false) {
     const target = this.cfg.target;
     const context = this.lines.slice(-3).map((l) => l.text);
     const last = this.lines.at(-1);
     if (last && last.text === text && t - last.t < 10) return null; // 几秒内一字不差的重复，多半是杂音胡编
     const line = { id: this.lines.length, t, text, tr: "", lang, same: lang === target };
+    if (low) line.low = true;
     this.lines.push(line);
     if (!line.same) line.tr = simplify(tr, target);
     this.send({ type: "line", ...line });

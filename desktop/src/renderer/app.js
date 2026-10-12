@@ -108,13 +108,14 @@ async function listMics() {
   }
 }
 
-function addLine({ id, t, text, tr, same }) {
+function addLine({ id, t, text, tr, same, low }) {
   const record = ws?.audio ? ws.sid : "";
   $("empty")?.remove();
   const el = document.createElement("div");
   el.className = "line";
   el.innerHTML = `<div class="t">${fmt(t)}</div><div><p class="en"></p><p class="zh wait">翻译中…</p></div>`;
   el.querySelector(".en").textContent = text;
+  if (low) { el.classList.add("low"); el.querySelector(".en").title = "这一句识别把握较低，可能听错了"; }
   const zh = el.querySelector(".zh");
   if (same) { zh.textContent = "（原话）"; zh.classList.add("tag"); zh.classList.remove("wait"); }
   else if (tr) { zh.textContent = tr; zh.classList.remove("wait"); }
