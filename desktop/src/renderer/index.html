@@ -162,7 +162,7 @@
   <label class="check" title="把这节课的原声存在这台电脑上，之后点字幕的时间就能回听"><input type="checkbox" id="saveAudio"> 保存录音</label>
   <label id="keepWrap" hidden>自动清理 <select id="keepDays"></select></label>
   <button id="audiosBtn" title="查看、播放或删除保存在这台电脑上的录音">查看录音</button>
-  <button id="pastBtn" title="看以前录过的课：课堂笔记、转写和课后精讲">以前的课</button>
+  <button id="pastBtn" title="看以前录过的课：课堂笔记、转写和课后精讲">课程回顾</button>
   <button id="settingsBtn">AI 模型与 API</button>
 </header>
 <main>
@@ -220,7 +220,7 @@
   <div class="actions"><button class="primary" id="privacyOk" type="button">我知道了</button></div>
 </dialog>
 <dialog id="past">
-  <h3>以前的课</h3>
+  <h3>课程回顾</h3>
   <div class="past-head"><select id="pastSel"></select>
     <span class="tabs"><button class="tab on" data-ptab="notes">课堂笔记</button><button class="tab" data-ptab="lines">转写</button><button class="tab" data-ptab="report">课后精讲</button></span></div>
   <div class="past-body" id="pastBody"></div>

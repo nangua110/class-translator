@@ -334,7 +334,7 @@ async function openAudios() {
 }
 $("audiosBtn").onclick = openAudios;
 
-// ---------- 以前的课：在弹窗里看任意一节课的课堂笔记、转写和课后精讲，不影响正在录的课 ----------
+// ---------- 课程回顾：在弹窗里看任意一节课的课堂笔记、转写和课后精讲，不影响正在录的课 ----------
 let past = { name: "", tab: "notes", rec: null, report: null };
 const PAST_EMPTY = { notes: "这节课没有课堂笔记（录的时候没填 AI 模型的 key，或者课太短）",
   lines: "这节课没有转写", report: "这节课还没有生成课后精讲，可以在右侧「课后精讲」里选这节课生成" };
