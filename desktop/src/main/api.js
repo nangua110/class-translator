@@ -154,7 +154,7 @@ export function createApi({ settings, llm, appleTr, records, caps, version, open
       case "GET /api/settings": return getSettings(q);
       case "POST /api/settings": return saveSettings(body);
       case "GET /api/records": return records.list().map((r) => ({ ...r, has_report: r.hasReport, has_audio: r.hasAudio })); // 界面沿用网页版字段名
-      case "GET /api/record": { // 「以前的课」：这节课的课堂笔记和转写
+      case "GET /api/record": { // 「课程回顾」：这节课的课堂笔记和转写
         const r = records.read(q.get("record"));
         return r ? { ok: true, ...r } : { ok: false };
       }
