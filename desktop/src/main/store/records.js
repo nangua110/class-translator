@@ -24,6 +24,21 @@ export function parseTranscript(md) {
   return md.split("\n").map((l) => l.match(LINE_RE)).filter(Boolean).map((m) => [m[1], m[2]]);
 }
 
+/** 读回整节课：课堂笔记（「## AI 总结」那一段）和每句的原文、翻译 */
+export function parseRecord(md) {
+  const m = md.match(/## AI 总结\n\n([\s\S]*?)\n\n## 转写\n/);
+  const summary = m && m[1].trim() !== "（暂无）" ? m[1].trim() : "";
+  const lines = [];
+  for (const row of md.split("\n")) {
+    const l = row.match(LINE_RE);
+    if (l) {
+      const [h, mi, s] = l[1].split(":").map(Number);
+      lines.push({ t: h * 3600 + mi * 60 + s, text: l[2], tr: "" });
+    } else if (row.startsWith("> ") && lines.length) lines.at(-1).tr = row.slice(2);
+  }
+  return { summary, lines };
+}
+
 export function reportMarkdown(outline, body, stem, lastTs) {
   const [h, m, s] = lastTs.split(":").map(Number);
   const mt = stem.match(/^(\d{4}-\d\d-\d\d)_(\d\d)-(\d\d)/);
@@ -52,6 +67,11 @@ export class Records {
   save(name, summary, lines) {
     fs.mkdirSync(this.dir, { recursive: true });
     fs.writeFileSync(this.#file(name), recordMarkdown(name.replace(/\.md$/, ""), summary, lines), "utf8");
+  }
+  /** 以前的一节课：课堂笔记和转写；没有这节课返回 null */
+  read(name) {
+    if (!this.exists(name)) return null;
+    return parseRecord(fs.readFileSync(this.#file(name), "utf8"));
   }
   transcript(name) {
     const f = this.#file(name);

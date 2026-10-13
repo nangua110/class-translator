@@ -85,17 +85,17 @@
   .history label { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
   .history select { flex: 1; min-width: 0; padding: 5px 8px; font-size: 14px; }
   .history button { padding: 5px 12px; font-size: 14px; }
-  #report h1 { font-size: 20px; margin: 12px 0 4px; }
-  #report h1 + blockquote { background: none; border: none; padding: 0; color: var(--muted); margin: 0 0 8px; }
-  #report h2 { font-size: 16px; color: var(--accent); margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 2px solid var(--accent-soft); }
-  #report h3 { font-size: 15px; margin: 16px 0 6px; }
-  #report blockquote { margin: 10px 0; padding: 6px 12px; background: var(--bg); border-left: 3px solid var(--accent); border-radius: 6px; }
-  #report blockquote p { margin: 4px 0; }
-  #report table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 14px; }
-  #report th, #report td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
-  #report th { background: var(--bg); }
-  #report hr { display: none; }
-  #report ol, #report ul { padding-left: 22px; }
+  #report h1, #pastBody h1 { font-size: 20px; margin: 12px 0 4px; }
+  #report h1 + blockquote, #pastBody h1 + blockquote { background: none; border: none; padding: 0; color: var(--muted); margin: 0 0 8px; }
+  #report h2, #pastBody h2 { font-size: 16px; color: var(--accent); margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 2px solid var(--accent-soft); }
+  #report h3, #pastBody h3 { font-size: 15px; margin: 16px 0 6px; }
+  #report blockquote, #pastBody blockquote { margin: 10px 0; padding: 6px 12px; background: var(--bg); border-left: 3px solid var(--accent); border-radius: 6px; }
+  #report blockquote p, #pastBody blockquote p { margin: 4px 0; }
+  #report table, #pastBody table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 14px; }
+  #report th, #report td, #pastBody th, #pastBody td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+  #report th, #pastBody th { background: var(--bg); }
+  #report hr, #pastBody hr { display: none; }
+  #report ol, #report ul, #pastBody ol, #pastBody ul { padding-left: 22px; }
   #summary ul { padding-left: 20px; }
   #summary h3 { font-size: 15px; margin: 16px 0 6px; }
   #summary p > em:only-child { color: var(--muted); font-size: 13px; font-style: normal; } /* 每段笔记前的时间范围 */
@@ -120,6 +120,11 @@
   dialog .err { font-size: 14px; color: var(--red); margin: 12px 0 0; }
   dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
   dialog [hidden] { display: none !important; }
+  dialog#past { width: min(860px, calc(100vw - 32px)); }
+  .past-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  .past-head select { flex: 1; min-width: 200px; padding: 6px 8px; font: inherit; font-size: 14px; }
+  .past-body { height: min(60vh, 560px); overflow-y: auto; border-top: 1px solid var(--line); padding-top: 4px; font-size: 14.5px; }
+  .past-body .line { grid-template-columns: 64px 1fr; }
   .audio-list { max-height: 50vh; overflow-y: auto; }
   .audio-list .item { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); }
   .audio-list .item:last-child { border-bottom: none; }
@@ -157,6 +162,7 @@
   <label class="check" title="把这节课的原声存在这台电脑上，之后点字幕的时间就能回听"><input type="checkbox" id="saveAudio"> 保存录音</label>
   <label id="keepWrap" hidden>自动清理 <select id="keepDays"></select></label>
   <button id="audiosBtn" title="查看、播放或删除保存在这台电脑上的录音">查看录音</button>
+  <button id="pastBtn" title="看以前录过的课：课堂笔记、转写和课后精讲">以前的课</button>
   <button id="settingsBtn">AI 模型与 API</button>
 </header>
 <main>
@@ -212,6 +218,14 @@
     <p class="hint">课堂录音前，请先确认学校和老师的规定。</p>
   </section>
   <div class="actions"><button class="primary" id="privacyOk" type="button">我知道了</button></div>
+</dialog>
+<dialog id="past">
+  <h3>以前的课</h3>
+  <div class="past-head"><select id="pastSel"></select>
+    <span class="tabs"><button class="tab on" data-ptab="notes">课堂笔记</button><button class="tab" data-ptab="lines">转写</button><button class="tab" data-ptab="report">课后精讲</button></span></div>
+  <div class="past-body" id="pastBody"></div>
+  <div class="actions"><button id="pastExport" type="button">导出 Markdown</button>
+    <button class="primary" id="pastClose" type="button">关闭</button></div>
 </dialog>
 <dialog id="audios">
   <h3>已保存的录音</h3>

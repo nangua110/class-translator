@@ -56,3 +56,18 @@ test("两个半小时的长课（3000 句）能正常列出", () => {
 test("newRecordName 格式", () => {
   assert.equal(newRecordName(new Date(2026, 9, 7, 9, 5, 3)), "2026-10-07_09-05-03.md");
 });
+
+test("读回以前的一节课：课堂笔记、每句的原文和翻译", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ct-rec-"));
+  const r = new Records(dir);
+  const summary = "*00:00:00 – 00:03:10*\n\n- **熵**：总是增加";
+  r.save("2026-10-12_09-00-00.md", summary, [{ t: 0, text: "Today we talk.", tr: "今天我们聊聊。" }, { t: 65, text: "OK.", tr: "" }]);
+  assert.deepEqual(r.read("2026-10-12_09-00-00.md"), {
+    summary,
+    lines: [{ t: 0, text: "Today we talk.", tr: "今天我们聊聊。" }, { t: 65, text: "OK.", tr: "" }],
+  });
+  r.save("2026-10-12_10-00-00.md", "", [{ t: 1, text: "Hi.", tr: "嗨。" }]);
+  assert.equal(r.read("2026-10-12_10-00-00.md").summary, "", "没有笔记时是空的，不是「（暂无）」");
+  assert.equal(r.read("../secret.md"), null);
+  assert.equal(r.read("2026-01-01_00-00-00.md"), null);
+});

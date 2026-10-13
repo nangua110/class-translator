@@ -234,7 +234,7 @@ let tab = "notes", reportMd = "", reportTitle = "", records = [];
 const REPORT_EMPTY = "选一节课，点「生成课后精讲」：会把整节课整理成章节大纲、AI 精讲、术语表、思考题和核心要点";
 function showTab(t) {
   tab = t;
-  for (const b of document.querySelectorAll(".tab")) b.classList.toggle("on", b.dataset.tab === t);
+  for (const b of document.querySelectorAll(".tab[data-tab]")) b.classList.toggle("on", b.dataset.tab === t);
   $("summary").hidden = t !== "notes";
   $("report").hidden = $("historyBar").hidden = t !== "report";
   $("sumBadge").hidden = $("sumBtn").hidden = t !== "notes";
@@ -243,7 +243,7 @@ function showTab(t) {
   $("exportBtn").disabled = t === "report" ? !reportMd : !summaryMd;
   if (t === "report" && !records.length) loadRecords();
 }
-for (const b of document.querySelectorAll(".tab")) b.onclick = () => showTab(b.dataset.tab);
+for (const b of document.querySelectorAll(".tab[data-tab]")) b.onclick = () => showTab(b.dataset.tab);
 
 // ---------- 回听原声：开了「保存录音」的课，点字幕或课后精讲里的时间就从那里播放 ----------
 const KEEP_DAYS = { 3: "3 天后", 7: "7 天后", 30: "30 天后", 0: "不清理" };
@@ -333,6 +333,63 @@ async function openAudios() {
   if (!$("audios").open) $("audios").showModal();
 }
 $("audiosBtn").onclick = openAudios;
+
+// ---------- 以前的课：在弹窗里看任意一节课的课堂笔记、转写和课后精讲，不影响正在录的课 ----------
+let past = { name: "", tab: "notes", rec: null, report: null };
+const PAST_EMPTY = { notes: "这节课没有课堂笔记（录的时候没填 AI 模型的 key，或者课太短）",
+  lines: "这节课没有转写", report: "这节课还没有生成课后精讲，可以在右侧「课后精讲」里选这节课生成" };
+function showPast() {
+  const box = $("pastBody"), { rec, report, tab, name } = past;
+  for (const b of document.querySelectorAll(".tab[data-ptab]")) b.classList.toggle("on", b.dataset.ptab === tab);
+  box.textContent = "";
+  box.scrollTop = 0;
+  const empty = (msg) => { const d = document.createElement("div"); d.className = "empty"; d.textContent = msg; box.append(d); };
+  if (!rec) return empty("读不到这节课的记录");
+  if (tab === "notes") { if (!rec.summary) return empty(PAST_EMPTY.notes); box.innerHTML = md2html(rec.summary); return linkTimes(box, name); }
+  if (tab === "report") { if (!report) return empty(PAST_EMPTY.report); box.innerHTML = md2html(report); return linkTimes(box, name); }
+  if (!rec.lines.length) return empty(PAST_EMPTY.lines);
+  const canPlay = records.find((x) => x.name === name)?.has_audio;
+  for (const l of rec.lines) {
+    const el = document.createElement("div");
+    el.className = "line";
+    el.innerHTML = '<div class="t"></div><div><p class="en"></p><p class="zh"></p></div>';
+    el.querySelector(".t").textContent = fmt(l.t);
+    el.querySelector(".en").textContent = l.text;
+    el.querySelector(".zh").textContent = l.tr;
+    if (canPlay) { const t = el.querySelector(".t"); t.classList.add("play"); t.title = "点击回听"; t.onclick = () => playAt(name, l.t); }
+    box.append(el);
+  }
+}
+async function pickPast() {
+  past.name = $("pastSel").value;
+  const enc = encodeURIComponent(past.name);
+  try {
+    const [rec, rep] = await Promise.all([apiFetch(`/api/record?record=${enc}`).then((r) => r.json()), apiFetch(`/api/report?record=${enc}`).then((r) => r.json())]);
+    past.rec = rec.ok ? rec : null;
+    past.report = rep.ok ? rep.md : null;
+  } catch { past.rec = past.report = null; }
+  showPast();
+}
+async function openPast() {
+  try { records = await (await apiFetch("/api/records")).json(); } catch { return toast("连不上本地服务，打不开"); }
+  if (!records.length) return toast("还没有录过的课");
+  $("pastSel").innerHTML = "";
+  for (const r of records) $("pastSel").add(new Option(recordLabel(r), r.name));
+  if (records.some((r) => r.name === past.name)) $("pastSel").value = past.name;
+  $("past").showModal();
+  await pickPast();
+}
+$("pastBtn").onclick = openPast;
+$("pastSel").onchange = pickPast;
+$("pastClose").onclick = () => $("past").close();
+for (const b of document.querySelectorAll(".tab[data-ptab]")) b.onclick = () => { past.tab = b.dataset.ptab; showPast(); };
+$("pastExport").onclick = () => { // 导出正在看的那一项
+  const { rec, report, tab, name } = past, stem = name.replace(/\.md$/, "");
+  if (tab === "notes" && rec?.summary) return download(`${stem}-课堂笔记.md`, `# 课堂笔记 ${stem}\n\n${rec.summary}\n`);
+  if (tab === "report" && report) return download(`${stem}-课后精讲.md`, report);
+  if (tab === "lines" && rec?.lines.length) return download(`${stem}-转写.md`, `# 转写 ${stem}\n\n` + rec.lines.map((l) => `**[${fmt(l.t)}]** ${l.text}\n` + (l.tr ? `\n> ${l.tr}\n` : "")).join("\n"));
+  toast("这一项是空的，没有可导出的内容");
+};
 $("audiosClose").onclick = () => $("audios").close();
 $("audiosFolder").onclick = () => apiFetch("/api/open-records-folder", { method: "POST" });
 async function savePrefs(body) {

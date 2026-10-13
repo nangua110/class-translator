@@ -247,3 +247,10 @@ test("其他模型：本地模型不用 key；删除 key", async () => {
   assert.equal(settings.getKey("openai"), "");
   assert.equal(settings.pref("openaiBase"), "https://api.example.com/v1");
 });
+
+test("以前的课：能读回课堂笔记和转写，名字不合法的拒绝", async () => {
+  const { api, records } = setup();
+  records.save(NAME, "- **要点**", [{ t: 5, text: "Hello.", tr: "你好。" }]);
+  assert.deepEqual(await api(`/api/record?record=${NAME}`, "GET"), { ok: true, summary: "- **要点**", lines: [{ t: 5, text: "Hello.", tr: "你好。" }] });
+  assert.deepEqual(await api("/api/record?record=../x.md", "GET"), { ok: false });
+});
