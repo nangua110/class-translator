@@ -1,6 +1,10 @@
-// 悬浮字幕页面：显示主进程推来的两行字，处理拖动、拉宽和几个小按钮
+// 悬浮字幕页面：窗口铺满整块屏幕，这里只画字幕条。拖动、拉宽、拉高都在页面里做，窗口不动，所以不抖不闪
 const $ = (id) => document.getElementById(id);
-let cur = null;
+const bar = $("bar");
+const MIN_W = 360, PAD = 22, SNAP = 1.8; // 最窄宽度；字幕条上下留白；拉到一句高度的 1.8 倍以上才算「多显示几句」
+let cur = null;   // 主进程推来的字幕和设置
+let geo = null;   // 字幕条位置（相对这块屏幕）：{x, bottom, width, tall}；tall 是拉高后的高度，null = 只显示一句
+let drag = null;  // 正在拖 / 拉
 
 /** 英文太长时只留最后两行（老师刚说的部分），前面用省略号 */
 function fitTail(el, text, lines = 2) {
@@ -29,7 +33,7 @@ function render(s) {
   if (s.en) fitTail(en, s.en); else en.textContent = "字幕会显示在这里";
   $("zh").textContent = s.zh;
   renderHist(s);
-  report();
+  apply();
 }
 
 /** 拉高时的列表：前面每一句的英文和它自己的翻译，最下面是老师正在说、还没说完的这句 */
@@ -48,40 +52,92 @@ function renderHist(s) {
   if (!box.childElementCount) row("字幕会显示在这里", null, "idle");
 }
 
-const PAD = 22; // 字幕条上下的留白
-let frameH = null; // 正在往上拉时字幕条的高度（这时窗口已经撑大，不能看窗口高度）
-const isTall = () => (frameH ?? innerHeight) > $("cur").offsetHeight + PAD + 8;
-const setFrame = (edge, f) => {
-  const root = document.documentElement.style;
-  if (f?.h) { root.setProperty("--fh", `${f.h}px`); frameH = f.h; }
-  if (f?.w) root.setProperty("--fw", `${f.w}px`);
-  document.body.classList.toggle("frame-t", !!f && edge === "t");
-  document.body.classList.toggle("frame-l", !!f && edge === "l");
-  if (!f) frameH = null;
-  report();
-};
-function report() { // 告诉主进程「只显示一句」要多高；窗口比这高就是拉高了，切成列表
-  window.overlay.height($("cur").offsetHeight + PAD);
-  document.body.classList.toggle("tall", isTall());
-}
-new ResizeObserver(report).observe($("cur"));
-addEventListener("resize", report);
-window.overlay.onState(render);
-window.overlay.onFrame((f) => setFrame(document.body.classList.contains("frame-l") ? "l" : "t", f));
+const oneH = () => $("cur").offsetHeight + PAD; // 只显示一句要多高
 
-// 拖动整条字幕；按住左右边缘是拉宽
-$("bar").addEventListener("pointerdown", (e) => {
-  if (e.button !== 0 || e.target.closest("button") || cur?.locked) return;
-  const edge = e.target.dataset.edge, sx = e.screenX, sy = e.screenY;
+/** 把 geo 画到字幕条上；位置收在屏幕里面 */
+function apply(h = drag?.h) {
+  if (!geo) return;
+  const W = innerWidth, H = innerHeight;
+  geo.width = Math.min(W, Math.max(MIN_W, geo.width));
+  geo.x = Math.min(W - geo.width, Math.max(0, geo.x));
+  const height = h ?? geo.tall;                       // 正在拉高时用手上的高度
+  geo.bottom = Math.min(H, Math.max(height ?? oneH(), geo.bottom));
+  bar.style.left = `${geo.x}px`;
+  bar.style.width = `${geo.width}px`;
+  bar.style.bottom = `${H - geo.bottom}px`;
+  if (!bar.classList.contains("collapsing")) {
+    bar.style.height = height ? `${Math.min(height, geo.bottom)}px` : "";
+    bar.classList.toggle("tall", !!height && height > oneH() + 8);
+  }
+  bar.classList.add("placed");
+}
+
+/** 平滑地回到只显示一句：高度慢慢缩，缩完再换成一句的样子 */
+function collapse() {
+  const from = bar.offsetHeight, to = oneH();
+  geo.tall = null;
+  if (from <= to + 2) return apply();
+  bar.classList.add("collapsing");
+  bar.style.height = `${from}px`;
+  bar.offsetHeight; // 让浏览器先记住起点
+  bar.style.transition = "height .22s cubic-bezier(.2,.8,.2,1)";
+  bar.style.height = `${to}px`;
+  const done = () => {
+    bar.removeEventListener("transitionend", done);
+    clearTimeout(timer);
+    bar.style.transition = "";
+    bar.classList.remove("collapsing");
+    apply();
+  };
+  const timer = setTimeout(done, 400);
+  bar.addEventListener("transitionend", done);
+}
+
+const save = (pt) => window.overlay.bar({ ...geo }, pt);
+
+window.overlay.onState(render);
+window.overlay.onBar((b) => { geo = { ...b }; apply(); if (cur?.en) fitTail($("en"), cur.en); });
+addEventListener("resize", () => apply());
+new ResizeObserver(() => { if (!drag) apply(); }).observe($("cur"));
+
+// ---------- 鼠标：只有在字幕条上时窗口才接鼠标，别处点下去落到下面的 PPT ----------
+let hot = false;
+const setHot = (v) => { if (v !== hot) { hot = v; window.overlay.hot(v); } };
+document.addEventListener("mousemove", (e) => {
+  if (drag) return setHot(true);
+  setHot(!!e.target.closest(document.body.classList.contains("locked") ? "#unlock" : "#bar"));
+});
+document.documentElement.addEventListener("mouseleave", () => { if (!drag) setHot(false); });
+
+// 拖动整条字幕；按住左右边缘拉宽，按住上边拉高
+bar.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0 || e.target.closest("button") || cur?.locked || bar.classList.contains("collapsing")) return;
+  const edge = e.target.dataset.edge ?? "move", sx = e.screenX, sy = e.screenY;
+  const g0 = { ...geo }, h0 = bar.offsetHeight;
+  drag = { edge, h: edge === "t" ? h0 : undefined };
+  bar.classList.add("dragging");
   e.target.setPointerCapture(e.pointerId);
-  // 先在当前窗口里把字幕条钉在底边 / 右边（看起来不变），窗口撑大时它就留在原地
-  if (edge === "t" || edge === "l") setFrame(edge, { h: $("bar").offsetHeight, w: $("bar").offsetWidth });
-  window.overlay.grab(edge);
-  const move = (ev) => window.overlay.move(ev.screenX - sx, ev.screenY - sy);
-  const up = () => {
+  const move = (ev) => {
+    const dx = ev.screenX - sx, dy = ev.screenY - sy;
+    if (edge === "move") Object.assign(geo, { x: g0.x + dx, bottom: g0.bottom + dy });
+    else if (edge === "r") geo.width = g0.width + dx;
+    else if (edge === "l") { const w = Math.max(MIN_W, g0.width - dx); Object.assign(geo, { width: w, x: g0.x + g0.width - w }); }
+    else if (edge === "t") drag.h = Math.min(g0.bottom, Math.max(oneH(), h0 - dy));
+    apply();
+    if (edge === "l" || edge === "r") { if (cur?.en) fitTail($("en"), cur.en); }
+  };
+  const up = (ev) => {
     e.target.removeEventListener("pointermove", move);
-    window.overlay.release();
-    if (edge && cur?.en) fitTail($("en"), cur.en);
+    bar.classList.remove("dragging");
+    const h = drag.h;
+    drag = null;
+    if (edge === "t") {
+      if (h >= oneH() * SNAP) geo.tall = Math.round(h);
+      else { bar.style.height = `${h}px`; collapse(); }  // 拉得不够高（放不下两句）：松手就平滑弹回一句，不停在半截
+    }
+    apply();
+    save(edge === "move" ? { x: ev.screenX, y: ev.screenY } : null);
+    setHot(!!document.elementFromPoint(ev.clientX, ev.clientY)?.closest("#bar"));
   };
   e.target.addEventListener("pointermove", move);
   e.target.addEventListener("pointerup", up, { once: true });
@@ -94,13 +150,10 @@ $("tools").addEventListener("click", (e) => {
   const v = Number(b.dataset.v);
   if (b.dataset.act === "font") window.overlay.prefs({ font: cur.font + v });
   else if (b.dataset.act === "opacity") window.overlay.prefs({ opacity: Math.round((cur.opacity + v) * 100) / 100 });
-  else if (b.dataset.act === "compact") window.overlay.prefs({ compact: true });
+  else if (b.dataset.act === "compact") { collapse(); save(); }
   else if (b.dataset.act === "lock") window.overlay.prefs({ locked: true });
-  else if (b.dataset.act === "hide") window.overlay.hide();
+  else if (b.dataset.act === "hide") { setHot(false); window.overlay.hide(); }
 });
 
-// 锁定时整个窗口不接鼠标，只有鼠标移到「解锁」上时临时接一下
-$("unlock").addEventListener("mouseenter", () => window.overlay.hot(true));
-$("unlock").addEventListener("mouseleave", () => window.overlay.hot(false));
-$("unlock").addEventListener("click", () => { window.overlay.hot(false); window.overlay.prefs({ locked: false }); });
-addEventListener("resize", () => { if (cur?.en) fitTail($("en"), cur.en); });
+// 锁定时只有「解锁」按钮接鼠标
+$("unlock").addEventListener("click", () => window.overlay.prefs({ locked: false }));

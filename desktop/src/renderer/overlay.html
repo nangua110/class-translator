@@ -7,62 +7,58 @@
 <style>
   :root { --font: 26px; --op: .65; }
   * { box-sizing: border-box; }
-  html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; -webkit-user-select: none;
+  /* 窗口铺满整块屏幕、完全透明，只有字幕条看得见 */
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; -webkit-user-select: none;
     font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
   /* 半透明黑底、白字，中文稍大 */
-  #bar { position: relative; margin: 0; padding: 10px 22px 12px; border-radius: 12px; color: #fff;
+  #bar { position: absolute; visibility: hidden; padding: 10px 22px 12px; border-radius: 12px; color: #fff;
     background: rgba(12, 13, 20, var(--op)); cursor: grab; }
-  #bar:active { cursor: grabbing; }
+  #bar.placed { visibility: visible; }
+  #bar.dragging { cursor: grabbing; }
   .en { margin: 0; font-size: calc(var(--font) * .78); line-height: 1.35; color: rgba(255,255,255,.82);
     text-shadow: 0 1px 2px rgba(0,0,0,.6); }
   .en.low { color: rgba(255,255,255,.45); }
   .zh { margin: 2px 0 0; font-size: var(--font); line-height: 1.35; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
   .zh:empty { display: none; }
   .idle { color: rgba(255,255,255,.55); font-size: calc(var(--font) * .7); }
-  /* 左右两边的细条：拉宽 / 拉窄 */
-  .grip { position: absolute; top: 0; bottom: 0; width: 10px; cursor: ew-resize; }
+  /* 能拉的地方：左右两边拉宽、上边拉高。鼠标移到字幕上时画出来（Mac 上悬浮字幕不抢焦点，系统不会把光标换成双箭头） */
+  .grip { position: absolute; top: 0; bottom: 0; width: 10px; cursor: ew-resize; z-index: 2; }
   .grip.l { left: 0; } .grip.r { right: 0; }
   .grip.t { left: 12px; right: 12px; bottom: auto; width: auto; height: 10px; cursor: ns-resize; }
-  /* 能拉的地方：鼠标移到字幕上时画出来（Mac 上悬浮字幕不抢焦点，系统不会把光标换成双箭头） */
   .grip::after { content: ""; position: absolute; border-radius: 3px; background: rgba(255,255,255,.35); opacity: 0; transition: opacity .15s, background .15s; }
   .grip.l::after, .grip.r::after { top: 50%; width: 4px; height: 28px; margin-top: -14px; left: 3px; }
   .grip.t::after { left: 50%; width: 44px; height: 4px; margin-left: -22px; top: 4px; }
-  body:hover .grip::after { opacity: 1; }
+  #bar:hover .grip::after, #bar.dragging .grip::after { opacity: 1; }
   .grip:hover::after { background: rgba(255,255,255,.8); }
   /* 拉高以后：按顺序列出前面几句（每句配自己的翻译），最新的在最下面，最上面的慢慢淡出 */
   #hist { display: none; }
-  body.tall #bar { height: 100vh; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
-  body.tall #hist { display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; min-height: 0; overflow: hidden;
+  #bar.tall { display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
+  #bar.tall #hist { display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; min-height: 0; overflow: hidden;
     -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 36px); }
-  body.tall #cur { position: absolute; left: 22px; right: 22px; visibility: hidden; } /* 不显示，只用来量一句话多高 */
+  #bar.tall #cur { position: absolute; left: 22px; right: 22px; top: 0; visibility: hidden; } /* 不显示，只用来量一句话多高 */
   .row { flex: none; }
-  /* 正在从上边 / 左边拉：窗口已经撑大，字幕条贴着底边 / 右边，大小由页面控制 */
-  body.frame-t #bar { position: absolute; left: 0; right: 0; bottom: 0; height: var(--fh) !important; }
-  body.frame-l #bar { position: absolute; right: 0; top: 0; bottom: 0; width: var(--fw); height: auto !important; }
+  .row .zh.wait { color: rgba(255,255,255,.4); font-weight: 400; font-size: calc(var(--font) * .6); }
   /* 收起 / 拉高切换时内容淡入，不是一下子换掉 */
   @keyframes fadein { from { opacity: 0; } }
-  body:not(.tall) #cur, body.tall #hist { animation: fadein .18s ease-out; }
-  .row .zh.wait { color: rgba(255,255,255,.4); font-weight: 400; font-size: calc(var(--font) * .6); }
-  /* 鼠标移上去才出现的小按钮 */
-  /* 收在字幕条右上角，不伸出去挡 PPT */
-  #tools { position: absolute; top: 6px; right: 10px; display: flex; gap: 4px; z-index: 1;
+  #bar:not(.tall) #cur, #bar.tall #hist { animation: fadein .18s ease-out; }
+  /* 鼠标移上去才出现的小按钮，收在字幕条右上角 */
+  #tools { position: absolute; top: 6px; right: 10px; display: flex; gap: 4px; z-index: 3;
     padding: 3px; border-radius: 8px; background: rgba(12, 13, 20, .85); opacity: 0; pointer-events: none; transition: opacity .15s; }
-  body:hover #tools { pointer-events: auto; }
-  body:hover #tools { opacity: 1; }
+  #bar:hover #tools { opacity: 1; pointer-events: auto; }
   #tools button, #unlock { font: 12px/1 inherit; white-space: nowrap; font-family: inherit; color: #fff; background: rgba(255,255,255,.12);
     border: 0; border-radius: 6px; padding: 5px 8px; cursor: pointer; }
   #tools button:hover, #unlock:hover { background: rgba(255,255,255,.28); }
-  #unlock { position: absolute; top: 6px; right: 10px; z-index: 1; opacity: 0; transition: opacity .15s; }
+  #unlock { position: absolute; top: 6px; right: 10px; z-index: 3; opacity: 0; transition: opacity .15s; }
   body.locked #tools, body.locked .grip { display: none; }
   body.locked #bar { cursor: default; }
-  body.locked:hover #unlock { opacity: .9; }
+  body.locked #bar:hover #unlock { opacity: .9; }
   body:not(.locked) #unlock { display: none; }
-  body:not(.tall) #compactBtn { display: none; }
+  #bar:not(.tall) #compactBtn { display: none; }
 </style>
 </head>
 <body>
-<button id="unlock" title="解锁后可以拖动、调整">解锁</button>
 <div id="bar">
+  <button id="unlock" title="解锁后可以拖动、调整">解锁</button>
   <div id="tools">
     <button data-act="font" data-v="-2" title="字小一点">A-</button>
     <button data-act="font" data-v="2" title="字大一点">A+</button>
