@@ -60,7 +60,7 @@ export class Overlay {
     const { area, bar } = place(this.saved, this.#areas());
     this.area = area;
     this.win.setBounds(area);
-    this.win.webContents.send("overlay:bar", bar);
+    this.win.webContents.send("overlay:bar", bar, area);
   }
 
   #create() {
@@ -96,18 +96,21 @@ export class Overlay {
     const on = (ch, fn) => ipcMain.on(ch, (e, arg) => { if (mine(e)) fn(arg ?? {}); });
     // 鼠标在字幕条上：接鼠标（能拖、能点按钮）；离开：不接，点下去落到下面的 PPT
     on("overlay:hot", ({ hot }) => this.win.setIgnoreMouseEvents(!hot, { forward: true }));
-    // 拖完 / 拉完松手：记住位置。松手时鼠标在另一块屏幕上，就把窗口搬过去
-    on("overlay:bar", ({ bar, pt }) => {
+    // 拖完 / 拉完松手：记住位置
+    on("overlay:bar", ({ bar }) => {
       if (!bar || !this.area || ![bar.x, bar.bottom, bar.width].every(Number.isFinite)) return;
       this.saved = toScreen(this.area, bar);
-      if (pt && Number.isFinite(pt.x) && Number.isFinite(pt.y)) {
-        const to = screen.getDisplayNearestPoint({ x: Math.round(pt.x), y: Math.round(pt.y) }).workArea;
-        if (to.x !== this.area.x || to.y !== this.area.y) {
-          this.saved = { ...this.saved, x: pt.x - bar.width / 2, bottom: Math.min(pt.y + 40, to.y + to.height) };
-          this.#layout();
-        }
-      }
       this.#save();
+    });
+    // 拖着字幕条、鼠标到了另一块屏幕上：把窗口搬过去，页面接着让字幕条跟着鼠标走（不用松手）
+    on("overlay:cross", ({ x, y }) => {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      const to = screen.getDisplayNearestPoint({ x: Math.round(x), y: Math.round(y) }).workArea;
+      if (to.x !== this.area.x || to.y !== this.area.y || to.width !== this.area.width || to.height !== this.area.height) {
+        this.area = to;
+        this.win.setBounds(to);
+      }
+      this.win.webContents.send("overlay:area", this.area);
     });
     on("overlay:prefs", (p) => {
       this.prefs = {

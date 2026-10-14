@@ -5,6 +5,7 @@ const MIN_W = 360, PAD = 22, SNAP = 1.8; // 最窄宽度；字幕条上下留白
 let cur = null;   // 主进程推来的字幕和设置
 let geo = null;   // 字幕条位置（相对这块屏幕）：{x, bottom, width, tall}；tall 是拉高后的高度，null = 只显示一句
 let drag = null;  // 正在拖 / 拉
+let area = null;  // 窗口铺着的这块屏幕在整个桌面上的位置和大小（跨屏拖动时会换）
 
 /** 英文太长时只留最后两行（老师刚说的部分），前面用省略号 */
 function fitTail(el, text, lines = 2) {
@@ -57,7 +58,7 @@ const oneH = () => $("cur").offsetHeight + PAD; // 只显示一句要多高
 /** 把 geo 画到字幕条上；位置收在屏幕里面 */
 function apply(h = drag?.h) {
   if (!geo) return;
-  const W = innerWidth, H = innerHeight;
+  const W = area?.width ?? innerWidth, H = area?.height ?? innerHeight; // 刚搬到另一块屏幕时窗口大小可能还没更新，以屏幕大小为准
   geo.width = Math.min(W, Math.max(MIN_W, geo.width));
   geo.x = Math.min(W - geo.width, Math.max(0, geo.x));
   const height = h ?? geo.tall;                       // 正在拉高时用手上的高度
@@ -93,10 +94,11 @@ function collapse() {
   bar.addEventListener("transitionend", done);
 }
 
-const save = (pt) => window.overlay.bar({ ...geo }, pt);
+const save = () => window.overlay.bar({ ...geo });
 
 window.overlay.onState(render);
-window.overlay.onBar((b) => { geo = { ...b }; apply(); if (cur?.en) fitTail($("en"), cur.en); });
+window.overlay.onBar((b, a) => { geo = { ...b }; area = a ?? area; apply(); if (cur?.en) fitTail($("en"), cur.en); });
+window.overlay.onArea((a) => { area = a; if (drag) drag.crossing = false; apply(); });
 addEventListener("resize", () => apply());
 new ResizeObserver(() => { if (!drag) apply(); }).observe($("cur"));
 
@@ -114,12 +116,23 @@ bar.addEventListener("pointerdown", (e) => {
   if (e.button !== 0 || e.target.closest("button") || cur?.locked || bar.classList.contains("collapsing")) return;
   const edge = e.target.dataset.edge ?? "move", sx = e.screenX, sy = e.screenY;
   const g0 = { ...geo }, h0 = bar.offsetHeight;
-  drag = { edge, h: edge === "t" ? h0 : undefined };
+  // 拖整条时记住鼠标在字幕条里的哪个位置：之后按鼠标在桌面上的绝对位置算，换了屏幕也接得上
+  const org = area ?? { x: e.screenX - e.clientX, y: e.screenY - e.clientY };
+  const ox = e.screenX - org.x - g0.x, oy = g0.bottom - (e.screenY - org.y);
+  drag = { edge, h: edge === "t" ? h0 : undefined, crossing: false };
   bar.classList.add("dragging");
   e.target.setPointerCapture(e.pointerId);
   const move = (ev) => {
     const dx = ev.screenX - sx, dy = ev.screenY - sy;
-    if (edge === "move") Object.assign(geo, { x: g0.x + dx, bottom: g0.bottom + dy });
+    if (edge === "move") {
+      const a = area ?? { ...org, width: innerWidth, height: innerHeight };
+      const px = ev.screenX - a.x, py = ev.screenY - a.y;
+      Object.assign(geo, { x: px - ox, bottom: py + oy });
+      if (!drag.crossing && (px < 0 || py < 0 || px >= a.width || py >= a.height)) { // 鼠标出了这块屏幕：问主进程要不要搬窗口
+        drag.crossing = true;
+        window.overlay.cross(ev.screenX, ev.screenY);
+      }
+    }
     else if (edge === "r") geo.width = g0.width + dx;
     else if (edge === "l") { const w = Math.max(MIN_W, g0.width - dx); Object.assign(geo, { width: w, x: g0.x + g0.width - w }); }
     else if (edge === "t") drag.h = Math.min(g0.bottom, Math.max(oneH(), h0 - dy));
@@ -136,7 +149,7 @@ bar.addEventListener("pointerdown", (e) => {
       else { bar.style.height = `${h}px`; collapse(); }  // 拉得不够高（放不下两句）：松手就平滑弹回一句，不停在半截
     }
     apply();
-    save(edge === "move" ? { x: ev.screenX, y: ev.screenY } : null);
+    save();
     setHot(!!document.elementFromPoint(ev.clientX, ev.clientY)?.closest("#bar"));
   };
   e.target.addEventListener("pointermove", move);
