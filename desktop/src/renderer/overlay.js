@@ -81,6 +81,7 @@ $("tools").addEventListener("click", (e) => {
   const v = Number(b.dataset.v);
   if (b.dataset.act === "font") window.overlay.prefs({ font: cur.font + v });
   else if (b.dataset.act === "opacity") window.overlay.prefs({ opacity: Math.round((cur.opacity + v) * 100) / 100 });
+  else if (b.dataset.act === "compact") window.overlay.prefs({ compact: true });
   else if (b.dataset.act === "lock") window.overlay.prefs({ locked: true });
   else if (b.dataset.act === "hide") window.overlay.hide();
 });

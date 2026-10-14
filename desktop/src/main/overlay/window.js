@@ -6,6 +6,7 @@ export const SHORTCUT = "CommandOrControl+Shift+Y";
 export const SHORTCUT_LABEL = process.platform === "darwin" ? "⌘⇧Y" : "Ctrl+Shift+Y";
 const DEFAULTS = { font: 26, opacity: 0.65, locked: false };
 const FONT = [16, 48], OPACITY = [0.2, 0.95];
+const SNAP = 1.8; // 拉高到一句高度的 1.8 倍以上才算「多显示几句」
 const clamp = (v, [lo, hi], def) => (Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def);
 
 /** 悬浮字幕：一直浮在最上层（PPT 全屏放映时也在），只显示老师正在说的这句和最近一句翻译。
@@ -92,7 +93,8 @@ export class Overlay {
   #save() {
     if (this.win && !this.win.isDestroyed()) {
       const b = this.win.getBounds();
-      this.tall = b.height > this.minH + 8 ? b.height : null; // 拉回到差不多一句的高度：回到只显示一句
+      this.tall = b.height >= this.minH * SNAP ? b.height : null; // 拉得不够高（放不下两句）：松手就弹回只显示一句，不停在半截
+      if (!this.tall && b.height !== this.minH) this.win.setBounds({ ...b, y: b.y + b.height - this.minH, height: this.minH });
       this.saved = { x: b.x, bottom: b.y + b.height, width: b.width, tall: this.tall };
     }
     this.settings.setPref("overlay", { ...this.prefs, bounds: this.saved });
@@ -123,6 +125,10 @@ export class Overlay {
       if (height !== b.height) this.win.setBounds({ ...b, y: b.y + b.height - height, height });
     });
     on("overlay:prefs", (p) => {
+      if (p.compact && this.win) { // 「收起」：回到只显示一句
+        const b = this.win.getBounds();
+        this.win.setBounds({ ...b, y: b.y + b.height - this.minH, height: this.minH });
+      }
       this.prefs = {
         font: clamp(p.font, FONT, this.prefs.font),
         opacity: clamp(p.opacity, OPACITY, this.prefs.opacity),

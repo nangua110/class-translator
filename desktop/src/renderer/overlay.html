@@ -51,6 +51,7 @@
   body.locked #bar { cursor: default; }
   body.locked:hover #unlock { opacity: .9; }
   body:not(.locked) #unlock { display: none; }
+  body:not(.tall) #compactBtn { display: none; }
 </style>
 </head>
 <body>
@@ -61,10 +62,11 @@
     <button data-act="font" data-v="2" title="字大一点">A+</button>
     <button data-act="opacity" data-v="-0.15" title="背景更透明">背景淡</button>
     <button data-act="opacity" data-v="0.15" title="背景更深">背景深</button>
+    <button data-act="compact" id="compactBtn" title="回到只显示一句（也可以把上边的横条往下拉）">收起</button>
     <button data-act="lock" title="锁定后鼠标会直接点到下面的 PPT，不会误点到字幕">锁定</button>
     <button data-act="hide" id="hideBtn">隐藏</button>
   </div>
-  <div class="grip l" data-edge="l"></div><div class="grip r" data-edge="r"></div><div class="grip t" data-edge="t" title="往上拉：多显示几句"></div>
+  <div class="grip l" data-edge="l"></div><div class="grip r" data-edge="r"></div><div class="grip t" data-edge="t" title="往上拉：多显示前面几句"></div>
   <div id="hist"></div>
   <div id="cur"><p class="en" id="en"></p><p class="zh" id="zh"></p></div>
 </div>
