@@ -43,3 +43,19 @@ test("自带翻译的句子、中文原话、低把握句子、新课清空", ()
   assert.deepEqual(run({ type: "line", id: 0, text: "A.", tr: "甲。" }, { type: "reset" }), EMPTY);
   assert.equal(run({ type: "error", msg: "x" }), EMPTY);
 });
+
+test("拉高时用的历史：每句配自己的翻译，最多留 30 句；草稿清空后不再算正在说", () => {
+  let s = run(
+    { type: "line", id: 0, text: "A.", tr: "" },
+    { type: "line", id: 1, text: "B.", tr: "乙。" },
+    { type: "translation", id: 0, tr: "甲。" },
+    { type: "partial", text: "C" },
+  );
+  assert.deepEqual(s.lines.map((l) => [l.en, l.zh]), [["A.", "甲。"], ["B.", "乙。"]]);
+  assert.equal(s.zh, "乙。", "旧句子的翻译晚到，只补进历史，不盖掉下面那行");
+  assert.equal(s.live, true);
+  assert.equal(nextState(s, { type: "partial", text: "" }).live, false);
+  for (let i = 2; i < 40; i++) s = nextState(s, { type: "line", id: i, text: `L${i}`, tr: "x" });
+  assert.equal(s.lines.length, 30);
+  assert.equal(s.lines.at(-1).en, "L39");
+});

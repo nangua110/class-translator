@@ -15,11 +15,13 @@ export class Overlay {
     Object.assign(this, { settings, preload, page, onVisible });
     this.state = EMPTY;
     this.win = null;
-    this.height = 96;
+    this.minH = 96;     // 只显示一句时需要的高度（页面量好告诉我们）
+    this.tall = null;   // 拉高后的高度；null = 只显示一句
     this.grab = null; // 正在拖动 / 拉宽时，按下鼠标那一刻的窗口位置
     const p = settings.pref("overlay", {}) ?? {};
     this.prefs = { font: clamp(p.font, FONT, DEFAULTS.font), opacity: clamp(p.opacity, OPACITY, DEFAULTS.opacity), locked: !!p.locked };
     this.saved = p.bounds ?? null;
+    this.tall = Number.isFinite(p.bounds?.tall) ? p.bounds.tall : null;
     this.#listen();
   }
 
@@ -53,8 +55,10 @@ export class Overlay {
 
   #bounds() {
     const areas = [screen.getPrimaryDisplay(), ...screen.getAllDisplays()].map((d) => d.workArea);
-    return place(this.saved, areas, this.height);
+    return place(this.saved, areas, this.#height());
   }
+
+  #height() { return Math.round(Math.max(this.minH, this.tall ?? 0)); }
 
   #create() {
     const win = new BrowserWindow({
@@ -83,10 +87,13 @@ export class Overlay {
     else this.win.setIgnoreMouseEvents(false);
   }
 
+  #area(b) { return screen.getDisplayMatching(b).workArea; }
+
   #save() {
     if (this.win && !this.win.isDestroyed()) {
       const b = this.win.getBounds();
-      this.saved = { x: b.x, bottom: b.y + b.height, width: b.width };
+      this.tall = b.height > this.minH + 8 ? b.height : null; // 拉回到差不多一句的高度：回到只显示一句
+      this.saved = { x: b.x, bottom: b.y + b.height, width: b.width, tall: this.tall };
     }
     this.settings.setPref("overlay", { ...this.prefs, bounds: this.saved });
   }
@@ -102,16 +109,18 @@ export class Overlay {
       else if (edge === "l") {
         const width = Math.max(MIN_W, Math.round(g.width - dx));
         this.win.setBounds({ ...g, x: g.x + g.width - width, width });
+      } else if (edge === "t") { // 拉高 / 压矮：底边不动
+        const top = this.#area(g).y;
+        const height = Math.round(Math.min(g.y + g.height - top, Math.max(this.minH, g.height - dy)));
+        this.win.setBounds({ ...g, y: g.y + g.height - height, height });
       } else this.win.setBounds({ ...g, x: Math.round(g.x + dx), y: Math.round(g.y + dy) });
     });
     on("overlay:release", () => { this.grab = null; this.#save(); });
-    on("overlay:height", ({ h }) => { // 内容多高窗口就多高，底边不动
+    on("overlay:height", ({ h }) => { // 一句话要多高；只显示一句时窗口跟着内容变高变矮，底边不动
       if (!Number.isFinite(h) || this.grab) return;
-      const height = Math.round(Math.min(600, Math.max(40, h)));
-      if (height === this.height) return;
-      const b = this.win.getBounds();
-      this.height = height;
-      this.win.setBounds({ ...b, y: b.y + b.height - height, height });
+      this.minH = Math.round(Math.min(600, Math.max(40, h)));
+      const b = this.win.getBounds(), height = this.#height();
+      if (height !== b.height) this.win.setBounds({ ...b, y: b.y + b.height - height, height });
     });
     on("overlay:prefs", (p) => {
       this.prefs = {

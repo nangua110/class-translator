@@ -26,13 +26,36 @@ function render(s) {
   const en = $("en");
   en.classList.toggle("low", !!s.low);
   en.classList.toggle("idle", !s.en);
-  if (s.en) fitTail(en, s.en); else en.textContent = "等老师开口……字幕会显示在这里";
+  if (s.en) fitTail(en, s.en); else en.textContent = "字幕会显示在这里";
   $("zh").textContent = s.zh;
+  renderHist(s);
   report();
 }
 
-const report = () => window.overlay.height(document.body.scrollHeight);
-new ResizeObserver(report).observe($("bar"));
+/** 拉高时的列表：前面每一句的英文和它自己的翻译，最下面是老师正在说、还没说完的这句 */
+function renderHist(s) {
+  const box = $("hist");
+  box.replaceChildren();
+  const row = (en, zh, cls = "") => {
+    const r = document.createElement("div");
+    r.className = "row";
+    const e = document.createElement("p"); e.className = `en ${cls}`; e.textContent = en; r.append(e);
+    if (zh !== null) { const z = document.createElement("p"); z.className = zh ? "zh" : "zh wait"; z.textContent = zh || "翻译中…"; r.append(z); }
+    box.append(r);
+  };
+  for (const l of s.lines) row(l.en, l.same ? null : l.zh, l.low ? "low" : "");
+  if (s.live && s.en) row(s.en, null);
+  if (!box.childElementCount) row("字幕会显示在这里", null, "idle");
+}
+
+const PAD = 22; // 字幕条上下的留白
+const isTall = () => innerHeight > $("cur").offsetHeight + PAD + 8;
+function report() { // 告诉主进程「只显示一句」要多高；窗口比这高就是拉高了，切成列表
+  window.overlay.height($("cur").offsetHeight + PAD);
+  document.body.classList.toggle("tall", isTall());
+}
+new ResizeObserver(report).observe($("cur"));
+addEventListener("resize", report);
 window.overlay.onState(render);
 
 // 拖动整条字幕；按住左右边缘是拉宽

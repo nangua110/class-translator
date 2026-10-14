@@ -22,6 +22,15 @@
   /* 左右两边的细条：拉宽 / 拉窄 */
   .grip { position: absolute; top: 0; bottom: 0; width: 10px; cursor: ew-resize; }
   .grip.l { left: 0; } .grip.r { right: 0; }
+  .grip.t { left: 12px; right: 12px; bottom: auto; width: auto; height: 8px; cursor: ns-resize; }
+  /* 拉高以后：按顺序列出前面几句（每句配自己的翻译），最新的在最下面，最上面的慢慢淡出 */
+  #hist { display: none; }
+  body.tall #bar { height: 100vh; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
+  body.tall #hist { display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; min-height: 0; overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 36px); }
+  body.tall #cur { position: absolute; left: 22px; right: 22px; visibility: hidden; } /* 不显示，只用来量一句话多高 */
+  .row { flex: none; }
+  .row .zh.wait { color: rgba(255,255,255,.4); font-weight: 400; font-size: calc(var(--font) * .6); }
   /* 鼠标移上去才出现的小按钮 */
   /* 收在字幕条右上角，不伸出去挡 PPT */
   #tools { position: absolute; top: 6px; right: 10px; display: flex; gap: 4px; z-index: 1;
@@ -49,9 +58,9 @@
     <button data-act="lock" title="锁定后鼠标会直接点到下面的 PPT，不会误点到字幕">锁定</button>
     <button data-act="hide" id="hideBtn">隐藏</button>
   </div>
-  <div class="grip l" data-edge="l"></div><div class="grip r" data-edge="r"></div>
-  <p class="en" id="en"></p>
-  <p class="zh" id="zh"></p>
+  <div class="grip l" data-edge="l"></div><div class="grip r" data-edge="r"></div><div class="grip t" data-edge="t" title="往上拉：多显示几句"></div>
+  <div id="hist"></div>
+  <div id="cur"><p class="en" id="en"></p><p class="zh" id="zh"></p></div>
 </div>
 <script src="overlay.js"></script>
 </body>
