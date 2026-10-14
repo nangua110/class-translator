@@ -159,6 +159,13 @@ async function main() {
   // 主窗口关了就退出（悬浮字幕不算：它只是主窗口的附属）
   mainWindow.on("closed", () => { deps.overlay.destroy(); deps.appleTr.stop(); deps.localTr.stop(); app.quit(); });
   app.on("window-all-closed", () => app.quit());
+  // 点程序坞图标：把缩小了的主窗口放回来（悬浮字幕开着时系统以为 App 还有窗口在显示，不会自己放回来）
+  app.on("activate", () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
   app.on("will-quit", () => deps.overlay.destroy());
 }
 

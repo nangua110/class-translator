@@ -43,7 +43,7 @@ function renderHist(s) {
     if (zh !== null) { const z = document.createElement("p"); z.className = zh ? "zh" : "zh wait"; z.textContent = zh || "翻译中…"; r.append(z); }
     box.append(r);
   };
-  for (const l of s.lines) row(l.en, l.same ? null : l.zh, l.low ? "low" : "");
+  for (const l of s.lines ?? []) row(l.en, l.same ? null : l.zh, l.low ? "low" : "");
   if (s.live && s.en) row(s.en, null);
   if (!box.childElementCount) row("字幕会显示在这里", null, "idle");
 }

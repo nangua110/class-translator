@@ -22,7 +22,13 @@
   /* 左右两边的细条：拉宽 / 拉窄 */
   .grip { position: absolute; top: 0; bottom: 0; width: 10px; cursor: ew-resize; }
   .grip.l { left: 0; } .grip.r { right: 0; }
-  .grip.t { left: 12px; right: 12px; bottom: auto; width: auto; height: 8px; cursor: ns-resize; }
+  .grip.t { left: 12px; right: 12px; bottom: auto; width: auto; height: 10px; cursor: ns-resize; }
+  /* 能拉的地方：鼠标移到字幕上时画出来（Mac 上悬浮字幕不抢焦点，系统不会把光标换成双箭头） */
+  .grip::after { content: ""; position: absolute; border-radius: 3px; background: rgba(255,255,255,.35); opacity: 0; transition: opacity .15s, background .15s; }
+  .grip.l::after, .grip.r::after { top: 50%; width: 4px; height: 28px; margin-top: -14px; left: 3px; }
+  .grip.t::after { left: 50%; width: 44px; height: 4px; margin-left: -22px; top: 4px; }
+  body:hover .grip::after { opacity: 1; }
+  .grip:hover::after { background: rgba(255,255,255,.8); }
   /* 拉高以后：按顺序列出前面几句（每句配自己的翻译），最新的在最下面，最上面的慢慢淡出 */
   #hist { display: none; }
   body.tall #bar { height: 100vh; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
