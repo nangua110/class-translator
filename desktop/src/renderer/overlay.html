@@ -23,14 +23,15 @@
   .grip { position: absolute; top: 0; bottom: 0; width: 10px; cursor: ew-resize; }
   .grip.l { left: 0; } .grip.r { right: 0; }
   /* 鼠标移上去才出现的小按钮 */
-  #tools { position: absolute; top: -1px; right: 14px; transform: translateY(-100%); display: flex; gap: 4px;
-    padding: 4px 6px; border-radius: 8px 8px 0 0; background: rgba(12, 13, 20, .85); opacity: 0; transition: opacity .15s; }
+  /* 收在字幕条右上角，不伸出去挡 PPT */
+  #tools { position: absolute; top: 6px; right: 10px; display: flex; gap: 4px; z-index: 1;
+    padding: 3px; border-radius: 8px; background: rgba(12, 13, 20, .85); opacity: 0; pointer-events: none; transition: opacity .15s; }
+  body:hover #tools { pointer-events: auto; }
   body:hover #tools { opacity: 1; }
-  #tools button, #unlock { font: 12px/1 inherit; font-family: inherit; color: #fff; background: rgba(255,255,255,.12);
+  #tools button, #unlock { font: 12px/1 inherit; white-space: nowrap; font-family: inherit; color: #fff; background: rgba(255,255,255,.12);
     border: 0; border-radius: 6px; padding: 5px 8px; cursor: pointer; }
   #tools button:hover, #unlock:hover { background: rgba(255,255,255,.28); }
-  body { padding-top: 30px; } /* 给按钮留位置 */
-  #unlock { position: absolute; top: 2px; right: 16px; opacity: 0; transition: opacity .15s; }
+  #unlock { position: absolute; top: 6px; right: 10px; z-index: 1; opacity: 0; transition: opacity .15s; }
   body.locked #tools, body.locked .grip { display: none; }
   body.locked #bar { cursor: default; }
   body.locked:hover #unlock { opacity: .9; }
