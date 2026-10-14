@@ -3,8 +3,9 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("overlay", {
   onState: (cb) => ipcRenderer.on("overlay:state", (_e, s) => cb(s)),
-  grab: () => ipcRenderer.send("overlay:grab"),
-  move: (dx, dy, edge) => ipcRenderer.send("overlay:move", { dx, dy, edge }),
+  onFrame: (cb) => ipcRenderer.on("overlay:frame", (_e, f) => cb(f)),
+  grab: (edge) => ipcRenderer.send("overlay:grab", { edge }),
+  move: (dx, dy) => ipcRenderer.send("overlay:move", { dx, dy }),
   release: () => ipcRenderer.send("overlay:release"),
   height: (h) => ipcRenderer.send("overlay:height", { h }),
   prefs: (p) => ipcRenderer.send("overlay:prefs", p),

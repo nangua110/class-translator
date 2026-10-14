@@ -49,7 +49,17 @@ function renderHist(s) {
 }
 
 const PAD = 22; // 字幕条上下的留白
-const isTall = () => innerHeight > $("cur").offsetHeight + PAD + 8;
+let frameH = null; // 正在往上拉时字幕条的高度（这时窗口已经撑大，不能看窗口高度）
+const isTall = () => (frameH ?? innerHeight) > $("cur").offsetHeight + PAD + 8;
+const setFrame = (edge, f) => {
+  const root = document.documentElement.style;
+  if (f?.h) { root.setProperty("--fh", `${f.h}px`); frameH = f.h; }
+  if (f?.w) root.setProperty("--fw", `${f.w}px`);
+  document.body.classList.toggle("frame-t", !!f && edge === "t");
+  document.body.classList.toggle("frame-l", !!f && edge === "l");
+  if (!f) frameH = null;
+  report();
+};
 function report() { // 告诉主进程「只显示一句」要多高；窗口比这高就是拉高了，切成列表
   window.overlay.height($("cur").offsetHeight + PAD);
   document.body.classList.toggle("tall", isTall());
@@ -57,14 +67,17 @@ function report() { // 告诉主进程「只显示一句」要多高；窗口比
 new ResizeObserver(report).observe($("cur"));
 addEventListener("resize", report);
 window.overlay.onState(render);
+window.overlay.onFrame((f) => setFrame(document.body.classList.contains("frame-l") ? "l" : "t", f));
 
 // 拖动整条字幕；按住左右边缘是拉宽
 $("bar").addEventListener("pointerdown", (e) => {
   if (e.button !== 0 || e.target.closest("button") || cur?.locked) return;
   const edge = e.target.dataset.edge, sx = e.screenX, sy = e.screenY;
   e.target.setPointerCapture(e.pointerId);
-  window.overlay.grab();
-  const move = (ev) => window.overlay.move(ev.screenX - sx, ev.screenY - sy, edge);
+  // 先在当前窗口里把字幕条钉在底边 / 右边（看起来不变），窗口撑大时它就留在原地
+  if (edge === "t" || edge === "l") setFrame(edge, { h: $("bar").offsetHeight, w: $("bar").offsetWidth });
+  window.overlay.grab(edge);
+  const move = (ev) => window.overlay.move(ev.screenX - sx, ev.screenY - sy);
   const up = () => {
     e.target.removeEventListener("pointermove", move);
     window.overlay.release();

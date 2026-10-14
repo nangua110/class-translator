@@ -118,21 +118,39 @@ export class Overlay {
   #listen() {
     const mine = (e) => this.win && !this.win.isDestroyed() && e.sender === this.win.webContents;
     const on = (ch, fn) => ipcMain.on(ch, (e, arg) => { if (mine(e)) fn(arg ?? {}); });
-    on("overlay:grab", () => { clearInterval(this.anim); this.anim = null; this.grab = this.win.getBounds(); });
-    on("overlay:move", ({ dx, dy, edge }) => {
-      const g = this.grab;
+    // 从上边 / 左边拉：窗口一边挪位置一边改大小时，系统会先把旧画面贴在左上角再重画，字就会抖。
+    // 所以按下时先把窗口一次撑到够大（底边 / 右边不动），拉的过程中窗口不动，只让页面里的字幕条变大变小；松手再缩回去
+    on("overlay:grab", ({ edge }) => {
+      clearInterval(this.anim); this.anim = null;
+      const g = this.grab = this.win.getBounds();
+      this.edge = edge;
+      this.target = null;
+      const a = this.#area(g);
+      if (edge === "t") this.canvas = { ...g, y: a.y, height: g.y + g.height - a.y };
+      else if (edge === "l") this.canvas = { ...g, x: a.x, width: g.x + g.width - a.x };
+      else this.canvas = null;
+      if (this.canvas) this.win.setBounds(this.canvas);
+    });
+    on("overlay:move", ({ dx, dy }) => {
+      const g = this.grab, edge = this.edge;
       if (!g || !Number.isFinite(dx) || !Number.isFinite(dy)) return;
       if (edge === "r") this.win.setBounds({ ...g, width: Math.max(MIN_W, Math.round(g.width + dx)) });
       else if (edge === "l") {
-        const width = Math.max(MIN_W, Math.round(g.width - dx));
-        this.win.setBounds({ ...g, x: g.x + g.width - width, width });
+        const width = Math.min(this.canvas.width, Math.max(MIN_W, Math.round(g.width - dx)));
+        this.target = { ...g, x: g.x + g.width - width, width };
+        this.win.webContents.send("overlay:frame", { w: width });
       } else if (edge === "t") { // 拉高 / 压矮：底边不动
-        const top = this.#area(g).y;
-        const height = Math.round(Math.min(g.y + g.height - top, Math.max(this.minH, g.height - dy)));
-        this.win.setBounds({ ...g, y: g.y + g.height - height, height });
+        const height = Math.round(Math.min(this.canvas.height, Math.max(this.minH, g.height - dy)));
+        this.target = { ...g, y: g.y + g.height - height, height };
+        this.win.webContents.send("overlay:frame", { h: height });
       } else this.win.setBounds({ ...g, x: Math.round(g.x + dx), y: Math.round(g.y + dy) });
     });
-    on("overlay:release", () => { this.grab = null; this.#save(); });
+    on("overlay:release", () => {
+      if (this.canvas) this.win.setBounds(this.target ?? this.grab);
+      this.canvas = this.target = this.grab = null;
+      this.win.webContents.send("overlay:frame", null);
+      this.#save();
+    });
     on("overlay:height", ({ h }) => { // 一句话要多高；只显示一句时窗口跟着内容变高变矮，底边不动
       if (!Number.isFinite(h) || this.grab || this.anim) return;
       this.minH = Math.round(Math.min(600, Math.max(40, h)));

@@ -36,6 +36,9 @@
     -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 36px); }
   body.tall #cur { position: absolute; left: 22px; right: 22px; visibility: hidden; } /* 不显示，只用来量一句话多高 */
   .row { flex: none; }
+  /* 正在从上边 / 左边拉：窗口已经撑大，字幕条贴着底边 / 右边，大小由页面控制 */
+  body.frame-t #bar { position: absolute; left: 0; right: 0; bottom: 0; height: var(--fh) !important; }
+  body.frame-l #bar { position: absolute; right: 0; top: 0; bottom: 0; width: var(--fw); height: auto !important; }
   /* 收起 / 拉高切换时内容淡入，不是一下子换掉 */
   @keyframes fadein { from { opacity: 0; } }
   body:not(.tall) #cur, body.tall #hist { animation: fadein .18s ease-out; }
