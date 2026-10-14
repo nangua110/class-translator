@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("api", {
   sendAudio: (buf) => ipcRenderer.send("session:audio", buf),
   sendCmd: (cmd) => ipcRenderer.send("session:cmd", cmd),
   closeSession: () => ipcRenderer.send("session:close"),
+  onOverlay: (cb) => ipcRenderer.on("overlay:visible", (_e, v) => cb(v)),
   onMessage: (cb) => {
     const handler = (_e, m) => cb(m);
     ipcRenderer.on("session:msg", handler);

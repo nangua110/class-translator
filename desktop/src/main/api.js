@@ -13,7 +13,7 @@ const AUDIO_CHUNK_SEC = 120;     // 播放录音时一次给窗口多长一段
 const safeName = (s) => String(s ?? "课后精讲").replace(/[\\/:*?"<>|]/g, "_").slice(0, 80);
 
 /** 窗口调用的全部接口（与网页版 /api/* 同名同参数，前端改动最小） */
-export function createApi({ settings, llm, appleTr, records, caps, version, openExternal, openPath, askMic, savePdf, cleanAudio, checkUpdate }) {
+export function createApi({ settings, llm, appleTr, records, caps, version, openExternal, openPath, askMic, savePdf, cleanAudio, checkUpdate, overlay }) {
   const audioPrefs = () => ({ saveAudio: !!settings.pref("saveAudio", false), audioKeepDays: settings.pref("audioKeepDays", 7) });
   const openaiConfig = () => ({ preset: settings.pref("openaiPreset", "deepseek"), base: settings.pref("openaiBase", ""), model: settings.pref("openaiModel", "") });
   /** 其他模型（OpenAI 兼容接口）：窗口只在用户动过这一栏时才带上这些字段。没问题返回 null */
@@ -150,6 +150,8 @@ export function createApi({ settings, llm, appleTr, records, caps, version, open
         settings.setPref("privacyAccepted", true);
         try { records.ensureDir(); } catch {} // 让系统的「文稿」权限询问在这时弹出，而不是上课中途
         return { ok: true };
+      case "GET /api/overlay": return { visible: !!overlay?.visible(), shortcut: overlay?.shortcut ?? "" };
+      case "POST /api/overlay": return { visible: !!overlay?.toggle(), shortcut: overlay?.shortcut ?? "" }; // 显示 / 隐藏悬浮字幕
       case "POST /api/mic-access": return { granted: await askMic() };
       case "GET /api/settings": return getSettings(q);
       case "POST /api/settings": return saveSettings(body);

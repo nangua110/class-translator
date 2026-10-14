@@ -1,8 +1,9 @@
 const SYS_HINT = "请到 系统设置 → 隐私与安全 → 录屏与系统录音 里允许「课堂同传」";
 
 /** 窗口 ↔ 后台：每个窗口最多一节进行中的课 */
-export function registerIpc({ ipcMain, api, makeSession, makeSystemAudio }) {
+export function registerIpc({ ipcMain, api, makeSession, makeSystemAudio, tap = () => {} }) {
   const live = new Map(); // webContents.id → {session, sys, send}
+  let newest = null;      // 最近开的那节课：悬浮字幕只跟着它（上一节课收尾时的迟到消息不显示）
   const closeFor = (id) => {
     const x = live.get(id);
     if (!x) return;
@@ -18,8 +19,13 @@ export function registerIpc({ ipcMain, api, makeSession, makeSystemAudio }) {
     closeFor(wc.id);
     let session = null;
     // 每条消息都带上所属课的标识，窗口据此丢掉上一节课迟到的消息
-    const send = (m) => { if (!wc.isDestroyed()) wc.send("session:msg", { ...m, sid: session?.name }); };
+    const send = (m) => {
+      if (!wc.isDestroyed()) wc.send("session:msg", { ...m, sid: session?.name });
+      if (session && session === newest) tap(m);
+    };
     session = makeSession(send);
+    newest = session;
+    tap({ type: "reset" });
     live.set(wc.id, { session, sys: null, send });
     wc.once("destroyed", () => closeFor(wc.id)); // 关窗口：存盘并杀掉子程序
     return { record: session.name, audio: !!session.recorder };

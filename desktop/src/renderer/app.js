@@ -380,6 +380,15 @@ async function openPast() {
   await pickPast();
 }
 $("pastBtn").onclick = openPast;
+
+// ---------- 悬浮字幕：看 PPT 时字幕浮在最上层 ----------
+const showOverlayBtn = (r) => {
+  $("overlayBtn").classList.toggle("on", !!r.visible);
+  if (r.shortcut) $("overlayBtn").title = `看 PPT 时把字幕浮在最上层，只显示老师正在说的这句和翻译（${r.shortcut} 随时显示 / 隐藏）`;
+};
+$("overlayBtn").onclick = async () => showOverlayBtn(await (await apiFetch("/api/overlay", { method: "POST" })).json());
+apiFetch("/api/overlay").then((r) => r.json()).then(showOverlayBtn).catch(() => {});
+window.api?.onOverlay?.((visible) => $("overlayBtn").classList.toggle("on", visible));
 $("pastSel").onchange = pickPast;
 $("pastClose").onclick = () => $("past").close();
 for (const b of document.querySelectorAll(".tab[data-ptab]")) b.onclick = () => { past.tab = b.dataset.ptab; showPast(); };

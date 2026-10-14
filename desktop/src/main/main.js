@@ -21,6 +21,7 @@ import { AudioRecorder, cleanOldAudio } from "./store/audio.js";
 import { latestVersion } from "./update.js";
 import { LocalTranslator } from "./local/translate.js";
 import { FileCrypto } from "./store/filecrypto.js";
+import { Overlay, SHORTCUT_LABEL } from "./overlay/window.js";
 
 const here = import.meta.dirname;
 app.setName("课堂同传");
@@ -78,8 +79,14 @@ function build() {
   });
   const version = process.env.CT_FAKE_VERSION ?? app.getVersion(); // 测试更新提示时可以假装成旧版
   const checkUpdate = () => latestVersion({ current: version, redirectOf, base: process.env.CT_UPDATE_BASE });
+  // 悬浮字幕：看 PPT 时浮在最上层，只显示老师正在说的这句和翻译
+  const overlay = new Overlay({
+    settings, preload: path.join(here, "../preload/overlay.cjs"), page: path.join(here, "../renderer/overlay.html"),
+    onVisible: (v) => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("overlay:visible", v); },
+  });
   const api = createApi({
     settings, llm, appleTr, records, caps, version, cleanAudio, checkUpdate,
+    overlay: { toggle: () => overlay.toggle(), visible: () => overlay.visible(), shortcut: SHORTCUT_LABEL },
     openExternal: (u) => shell.openExternal(u),
     openPath: (p) => { fs.mkdirSync(p, { recursive: true }); return shell.openPath(p); },
     askMic: () => (process.platform === "darwin" ? systemPreferences.askForMediaAccess("microphone") : Promise.resolve(true)),
@@ -87,7 +94,7 @@ function build() {
   });
   // 旧版存在钥匙串里的 key：等窗口显示出来再转存（系统弹窗期间 App 会卡住，先弹的话窗口是一片白）
   const migrateKeys = () => { if (settings.migrateLegacy()) llm.configure(); };
-  return { api, makeSession, makeSystemAudio: () => new SystemAudio(bins.syscap), appleTr, localTr, migrateKeys };
+  return { api, makeSession, makeSystemAudio: () => new SystemAudio(bins.syscap), appleTr, localTr, migrateKeys, overlay, tap: (m) => overlay.tap(m) };
 }
 
 function createWindow() {
@@ -137,6 +144,7 @@ async function main() {
   registerIpc({ ipcMain, ...deps });
   mainWindow = createWindow();
   mainWindow.webContents.once("did-finish-load", () => setTimeout(deps.migrateKeys, 800));
+  deps.overlay.registerShortcut();
   if (process.env.CT_SMOKE_OPEN) {
     mainWindow.webContents.on("console-message", (_e, _lvl, msg) => console.log("CONSOLE " + msg));
     mainWindow.webContents.once("did-finish-load", async () => {
@@ -148,7 +156,10 @@ async function main() {
       app.quit();
     });
   }
-  app.on("window-all-closed", () => { deps.appleTr.stop(); deps.localTr.stop(); app.quit(); });
+  // 主窗口关了就退出（悬浮字幕不算：它只是主窗口的附属）
+  mainWindow.on("closed", () => { deps.overlay.destroy(); deps.appleTr.stop(); deps.localTr.stop(); app.quit(); });
+  app.on("window-all-closed", () => app.quit());
+  app.on("will-quit", () => deps.overlay.destroy());
 }
 
 main();

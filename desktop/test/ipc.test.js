@@ -44,3 +44,20 @@ test("上一节课还在收尾（生成最终笔记）时可以马上开新课�
   await stopping;
   assert.deepEqual(stopped, ["s1.md"]);
 });
+
+test("悬浮字幕只收到最近开的那节课的消息，开新课时先清空", async () => {
+  let n = 0;
+  const handles = {}, ons = {}, tapped = [];
+  const ipcMain = { handle: (ch, fn) => { handles[ch] = fn; }, on: (ch, fn) => { ons[ch] = fn; } };
+  const sessions = [];
+  registerIpc({ ipcMain, api: async () => ({}), makeSystemAudio: () => ({}), tap: (m) => tapped.push(m),
+    makeSession: (send) => { const s = { name: `s${++n}.md`, send, configure() {}, dispose() {}, stop: async () => {} }; sessions.push(s); return s; } });
+  const e = { sender: { id: 1, isDestroyed: () => false, send() {}, once() {} } };
+  await handles["session:open"](e);
+  sessions[0].send({ type: "line", text: "A" });
+  await ons["session:cmd"](e, "stop");
+  await handles["session:open"](e);
+  sessions[0].send({ type: "done" });          // 上一节课收尾的迟到消息
+  sessions[1].send({ type: "partial", text: "B" });
+  assert.deepEqual(tapped.map((m) => m.type + (m.text ?? "")), ["reset", "lineA", "reset", "partialB"]);
+});

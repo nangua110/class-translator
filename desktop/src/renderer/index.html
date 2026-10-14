@@ -29,6 +29,7 @@
   select, button { font: inherit; border-radius: 10px; border: 1px solid var(--line);
     background: var(--card); color: var(--text); padding: 7px 14px; cursor: pointer; }
   button.primary { background: var(--accent); color: #fff; border-color: transparent; }
+  #overlayBtn.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
   button.danger { background: var(--red); color: #fff; border-color: transparent; }
   button:disabled { opacity: .45; cursor: default; }
   .spacer { flex: 1; }
@@ -162,6 +163,7 @@
   <label class="check" title="把这节课的原声存在这台电脑上，之后点字幕的时间就能回听"><input type="checkbox" id="saveAudio"> 保存录音</label>
   <label id="keepWrap" hidden>自动清理 <select id="keepDays"></select></label>
   <button id="audiosBtn" title="查看、播放或删除保存在这台电脑上的录音">查看录音</button>
+  <button id="overlayBtn" title="看 PPT 时把字幕浮在最上层，只显示老师正在说的这句和翻译">悬浮字幕</button>
   <button id="pastBtn" title="看以前录过的课：课堂笔记、转写和课后精讲">课程回顾</button>
   <button id="settingsBtn">AI 模型与 API</button>
 </header>

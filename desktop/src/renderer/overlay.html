@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>悬浮字幕</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+<style>
+  :root { --font: 26px; --op: .65; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; -webkit-user-select: none;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  /* 半透明黑底、白字，中文稍大 */
+  #bar { position: relative; margin: 0; padding: 10px 22px 12px; border-radius: 12px; color: #fff;
+    background: rgba(12, 13, 20, var(--op)); cursor: grab; }
+  #bar:active { cursor: grabbing; }
+  .en { margin: 0; font-size: calc(var(--font) * .78); line-height: 1.35; color: rgba(255,255,255,.82);
+    text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+  .en.low { color: rgba(255,255,255,.45); }
+  .zh { margin: 2px 0 0; font-size: var(--font); line-height: 1.35; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+  .zh:empty { display: none; }
+  .idle { color: rgba(255,255,255,.55); font-size: calc(var(--font) * .7); }
+  /* 左右两边的细条：拉宽 / 拉窄 */
+  .grip { position: absolute; top: 0; bottom: 0; width: 10px; cursor: ew-resize; }
+  .grip.l { left: 0; } .grip.r { right: 0; }
+  /* 鼠标移上去才出现的小按钮 */
+  #tools { position: absolute; top: -1px; right: 14px; transform: translateY(-100%); display: flex; gap: 4px;
+    padding: 4px 6px; border-radius: 8px 8px 0 0; background: rgba(12, 13, 20, .85); opacity: 0; transition: opacity .15s; }
+  body:hover #tools { opacity: 1; }
+  #tools button, #unlock { font: 12px/1 inherit; font-family: inherit; color: #fff; background: rgba(255,255,255,.12);
+    border: 0; border-radius: 6px; padding: 5px 8px; cursor: pointer; }
+  #tools button:hover, #unlock:hover { background: rgba(255,255,255,.28); }
+  body { padding-top: 30px; } /* 给按钮留位置 */
+  #unlock { position: absolute; top: 2px; right: 16px; opacity: 0; transition: opacity .15s; }
+  body.locked #tools, body.locked .grip { display: none; }
+  body.locked #bar { cursor: default; }
+  body.locked:hover #unlock { opacity: .9; }
+  body:not(.locked) #unlock { display: none; }
+</style>
+</head>
+<body>
+<button id="unlock" title="解锁后可以拖动、调整">解锁</button>
+<div id="bar">
+  <div id="tools">
+    <button data-act="font" data-v="-2" title="字小一点">A-</button>
+    <button data-act="font" data-v="2" title="字大一点">A+</button>
+    <button data-act="opacity" data-v="-0.15" title="背景更透明">背景淡</button>
+    <button data-act="opacity" data-v="0.15" title="背景更深">背景深</button>
+    <button data-act="lock" title="锁定后鼠标会直接点到下面的 PPT，不会误点到字幕">锁定</button>
+    <button data-act="hide" id="hideBtn">隐藏</button>
+  </div>
+  <div class="grip l" data-edge="l"></div><div class="grip r" data-edge="r"></div>
+  <p class="en" id="en"></p>
+  <p class="zh" id="zh"></p>
+</div>
+<script src="overlay.js"></script>
+</body>
+</html>
