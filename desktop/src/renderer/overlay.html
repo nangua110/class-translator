@@ -36,6 +36,9 @@
     -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 36px); }
   body.tall #cur { position: absolute; left: 22px; right: 22px; visibility: hidden; } /* 不显示，只用来量一句话多高 */
   .row { flex: none; }
+  /* 收起 / 拉高切换时内容淡入，不是一下子换掉 */
+  @keyframes fadein { from { opacity: 0; } }
+  body:not(.tall) #cur, body.tall #hist { animation: fadein .18s ease-out; }
   .row .zh.wait { color: rgba(255,255,255,.4); font-weight: 400; font-size: calc(var(--font) * .6); }
   /* 鼠标移上去才出现的小按钮 */
   /* 收在字幕条右上角，不伸出去挡 PPT */

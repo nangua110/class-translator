@@ -90,11 +90,26 @@ export class Overlay {
 
   #area(b) { return screen.getDisplayMatching(b).workArea; }
 
-  #save() {
+  /** 底边不动，把高度在 0.22 秒内平滑地变到 height（先快后慢），不是一下子跳过去 */
+  #animateTo(height, ms = 220) {
+    clearInterval(this.anim);
+    const b = this.win.getBounds(), bottom = b.y + b.height, from = b.height, t0 = Date.now();
+    if (from === height) return;
+    const step = () => {
+      if (this.win.isDestroyed()) return clearInterval(this.anim);
+      const k = Math.min(1, (Date.now() - t0) / ms), h = Math.round(from + (height - from) * (1 - (1 - k) ** 3));
+      this.win.setBounds({ x: b.x, width: b.width, y: bottom - h, height: h });
+      if (k >= 1) { clearInterval(this.anim); this.anim = null; }
+    };
+    this.anim = setInterval(step, 16);
+    step();
+  }
+
+  #save({ compact = false } = {}) {
     if (this.win && !this.win.isDestroyed()) {
       const b = this.win.getBounds();
-      this.tall = b.height >= this.minH * SNAP ? b.height : null; // 拉得不够高（放不下两句）：松手就弹回只显示一句，不停在半截
-      if (!this.tall && b.height !== this.minH) this.win.setBounds({ ...b, y: b.y + b.height - this.minH, height: this.minH });
+      this.tall = !compact && b.height >= this.minH * SNAP ? b.height : null; // 拉得不够高（放不下两句）：松手就弹回只显示一句，不停在半截
+      if (!this.tall && b.height !== this.minH) this.#animateTo(this.minH);
       this.saved = { x: b.x, bottom: b.y + b.height, width: b.width, tall: this.tall };
     }
     this.settings.setPref("overlay", { ...this.prefs, bounds: this.saved });
@@ -103,7 +118,7 @@ export class Overlay {
   #listen() {
     const mine = (e) => this.win && !this.win.isDestroyed() && e.sender === this.win.webContents;
     const on = (ch, fn) => ipcMain.on(ch, (e, arg) => { if (mine(e)) fn(arg ?? {}); });
-    on("overlay:grab", () => { this.grab = this.win.getBounds(); });
+    on("overlay:grab", () => { clearInterval(this.anim); this.anim = null; this.grab = this.win.getBounds(); });
     on("overlay:move", ({ dx, dy, edge }) => {
       const g = this.grab;
       if (!g || !Number.isFinite(dx) || !Number.isFinite(dy)) return;
@@ -119,23 +134,19 @@ export class Overlay {
     });
     on("overlay:release", () => { this.grab = null; this.#save(); });
     on("overlay:height", ({ h }) => { // 一句话要多高；只显示一句时窗口跟着内容变高变矮，底边不动
-      if (!Number.isFinite(h) || this.grab) return;
+      if (!Number.isFinite(h) || this.grab || this.anim) return;
       this.minH = Math.round(Math.min(600, Math.max(40, h)));
       const b = this.win.getBounds(), height = this.#height();
       if (height !== b.height) this.win.setBounds({ ...b, y: b.y + b.height - height, height });
     });
     on("overlay:prefs", (p) => {
-      if (p.compact && this.win) { // 「收起」：回到只显示一句
-        const b = this.win.getBounds();
-        this.win.setBounds({ ...b, y: b.y + b.height - this.minH, height: this.minH });
-      }
       this.prefs = {
         font: clamp(p.font, FONT, this.prefs.font),
         opacity: clamp(p.opacity, OPACITY, this.prefs.opacity),
         locked: typeof p.locked === "boolean" ? p.locked : this.prefs.locked,
       };
       this.#applyLock();
-      this.#save();
+      this.#save({ compact: !!p.compact }); // 「收起」：平滑地回到只显示一句
       this.#push();
     });
     on("overlay:hot", ({ hot }) => this.#applyLock(!!hot));
