@@ -2,11 +2,11 @@
 
 <h1 align="center">课堂同传</h1>
 
-<p align="center">上课听不懂英文？课堂同传把老师说的话实时变成字幕，并翻译成中文；下课后自动整理成课后精讲。</p>
+<p align="center">上课听不懂英文？课堂同传是一款免费的课堂同声传译软件，把老师说的英语实时变成字幕并翻译成中文（英译中），适合留学生上英文课、看英文网课和讲座；下课后自动整理成课后精讲。</p>
 
 <p align="center"><b>预览版 v0.8.1</b> · 免费 · Powered by 南瓜</p>
 
-<p align="center"><a href="../../releases/latest"><b>下载最新版</b></a></p>
+<p align="center"><a href="../../releases/latest"><b>下载最新版</b></a> · <a href="https://nangua110.github.io/class-translator/">项目主页</a></p>
 
 ![课堂同传主界面](docs/images/app.png)
 
