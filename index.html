@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>课堂同传 - 免费的英文课堂实时字幕与中文翻译软件（Mac / Windows）</title>
+<meta name="description" content="课堂同传是一款免费的上课同声传译软件：老师讲英语，电脑上实时出英文字幕并翻译成中文，看 PPT 时字幕可以悬浮在最上层，还能录音回听，下课自动生成课后精讲。适合留学生上英文课、看英文网课和讲座。支持 Mac 和 Windows。">
+<meta name="keywords" content="课堂同传,同声传译软件,实时翻译,实时字幕,英译中,英文课听不懂,留学生上课,英文网课字幕,课堂翻译,语音转文字,上课录音转文字,悬浮字幕">
+<meta name="author" content="南瓜">
+<link rel="canonical" href="https://nangua110.github.io/class-translator/">
+<link rel="icon" type="image/png" href="images/icon.png">
+<meta name="theme-color" content="#6366f1">
+
+<meta property="og:type" content="website">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:site_name" content="课堂同传">
+<meta property="og:title" content="课堂同传 - 英文课实时字幕与中文翻译（免费，Mac / Windows）">
+<meta property="og:description" content="老师讲英语，电脑上实时出字幕并翻译成中文。悬浮字幕、录音回听、课后精讲，留学生上课听不懂也能跟上。">
+<meta property="og:url" content="https://nangua110.github.io/class-translator/">
+<meta property="og:image" content="https://nangua110.github.io/class-translator/images/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="课堂同传 - 英文课实时字幕与中文翻译">
+<meta name="twitter:description" content="老师讲英语，电脑上实时出字幕并翻译成中文。免费，Mac / Windows。">
+<meta name="twitter:image" content="https://nangua110.github.io/class-translator/images/og.png">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "课堂同传",
+  "alternateName": "Class Translator",
+  "applicationCategory": "EducationalApplication",
+  "operatingSystem": "macOS, Windows 10, Windows 11",
+  "description": "免费的课堂同声传译软件：英文课实时字幕并翻译成中文，悬浮字幕、录音回听、课后精讲。",
+  "url": "https://nangua110.github.io/class-translator/",
+  "downloadUrl": "https://github.com/nangua110/class-translator/releases/latest",
+  "image": "https://nangua110.github.io/class-translator/images/app.png",
+  "inLanguage": "zh-CN",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+  "author": { "@type": "Person", "name": "南瓜", "url": "https://github.com/nangua110" }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "上课听不懂英语怎么办？",
+      "acceptedAnswer": { "@type": "Answer", "text": "可以在电脑上打开课堂同传，它会把老师说的英语实时变成字幕并翻译成中文，没听清的句子随时往回看；打开「保存录音」后还能点字幕回听原话，下课自动生成带术语表的课后精讲，方便复习。" } },
+    { "@type": "Question", "name": "有没有免费的英文课堂实时翻译软件？",
+      "acceptedAnswer": { "@type": "Answer", "text": "课堂同传是免费的，支持 Mac 和 Windows。英语课不用注册、不用填 key 就能出英文字幕和中文直译；填一个免费的 Gemini key 后，翻译会结合上下文、纠正识别错字，并生成课堂笔记和课后精讲。" } },
+    { "@type": "Question", "name": "英文网课、视频讲座能实时出中文字幕吗？",
+      "acceptedAnswer": { "@type": "Answer", "text": "可以。课堂同传能直接识别电脑内部的声音，不用麦克风，看网课、YouTube 讲座、线上会议时都能实时出英文字幕和中文翻译，还可以打开悬浮字幕，让字幕浮在视频或 PPT 上面。" } },
+    { "@type": "Question", "name": "看 PPT 的时候怎么同时看字幕？",
+      "acceptedAnswer": { "@type": "Answer", "text": "点「悬浮字幕」或按快捷键（Mac 上 ⌘⇧Y，Windows 上 Ctrl+Shift+Y），字幕会浮在所有窗口最上层，PPT 全屏放映时也看得到，可以拖动、拉宽、拉高显示多句。" } },
+    { "@type": "Question", "name": "课堂录音和字幕会上传吗？",
+      "acceptedAnswer": { "@type": "Answer", "text": "本地识别和本地翻译只在你的电脑上处理，不上传；录音只保存在你自己的电脑上。只有你选择使用 Gemini、Claude 等 AI 模型时，转写的文字才会发给你选的那家服务商。作者收不到任何数据。" } }
+  ]
+}
+</script>
+
+<style>
+:root {
+  --bg: #f6f7fb; --card: #ffffff; --text: #1f2330; --muted: #5d6475; --line: #e4e7ef;
+  --accent: #5b5fe0; --accent-soft: #eef0ff; --accent-text: #ffffff; --shadow: 0 10px 30px rgba(40, 45, 90, .10);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12141b; --card: #1b1e28; --text: #e8eaf2; --muted: #a2a8b8; --line: #2c3040;
+    --accent: #8b8ff5; --accent-soft: #252948; --accent-text: #12141b; --shadow: 0 10px 30px rgba(0, 0, 0, .35);
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.75 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+}
+a { color: var(--accent); }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; }
+nav .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text); text-decoration: none; }
+nav .brand img { width: 32px; height: 32px; }
+nav .links a { color: var(--muted); text-decoration: none; margin-left: 20px; font-size: 15px; }
+nav .links a:hover { color: var(--text); }
+
+.hero { text-align: center; padding: 48px 0 28px; }
+.hero img.icon { width: 96px; height: 96px; }
+.hero h1 { font-size: clamp(34px, 6vw, 52px); margin: 12px 0 6px; letter-spacing: .02em; }
+.hero .lead { font-size: clamp(18px, 2.6vw, 22px); color: var(--text); margin: 0 auto; max-width: 720px; }
+.hero .sub { color: var(--muted); margin: 10px auto 0; max-width: 680px; }
+.meta { color: var(--muted); font-size: 14px; margin-top: 14px; }
+
+.dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 640px; margin: 26px auto 0; }
+.dl a {
+  display: block; padding: 14px 16px; border-radius: 12px; text-decoration: none; text-align: left;
+  background: var(--card); color: var(--text); border: 1px solid var(--line); line-height: 1.4;
+}
+.dl a.main { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.dl a b { display: block; font-size: 16px; }
+.dl a span { font-size: 13px; opacity: .8; }
+.dl a:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+.dl-note { color: var(--muted); font-size: 14px; margin-top: 12px; }
+
+.shot { margin: 36px auto 0; border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); border: 1px solid var(--line); background: var(--card); }
+.shot img { display: block; width: 100%; height: auto; }
+
+section { padding: 56px 0 8px; }
+h2 { font-size: clamp(24px, 3.4vw, 30px); margin: 0 0 8px; }
+.section-lead { color: var(--muted); margin: 0 0 24px; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+.card h3 { margin: 0 0 6px; font-size: 17px; }
+.card p { margin: 0; color: var(--muted); font-size: 15px; }
+
+.split { display: grid; grid-template-columns: 1fr 1.35fr; gap: 28px; align-items: center; }
+.split ul { padding-left: 1.2em; color: var(--muted); }
+.split li { margin: 6px 0; }
+.split .shot { margin: 0; }
+
+.who { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+
+table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 14px; overflow: hidden; border: 1px solid var(--line); font-size: 15px; }
+th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { background: var(--accent-soft); font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+
+details { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; }
+summary { cursor: pointer; font-weight: 600; }
+details p { color: var(--muted); margin: 10px 0 0; }
+
+.steps { counter-reset: s; padding: 0; list-style: none; }
+.steps li { counter-increment: s; position: relative; padding-left: 40px; margin: 14px 0; color: var(--muted); }
+.steps li::before {
+  content: counter(s); position: absolute; left: 0; top: 2px; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 14px; display: grid; place-items: center;
+}
+.steps b { color: var(--text); }
+
+footer { margin-top: 64px; padding: 28px 0 40px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; text-align: center; }
+footer a { color: var(--muted); }
+
+@media (max-width: 760px) {
+  nav .links a:not(.gh) { display: none; }
+  .grid, .who { grid-template-columns: 1fr; }
+  .split { grid-template-columns: 1fr; }
+  .dl { grid-template-columns: 1fr; }
+  th, td { padding: 10px 12px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="brand" href="./"><img src="images/icon.png" alt="">课堂同传</a>
+    <div class="links">
+      <a href="#features">功能</a>
+      <a href="#download">下载</a>
+      <a href="#faq">常见问题</a>
+      <a class="gh" href="https://github.com/nangua110/class-translator">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="hero" id="download">
+    <img class="icon" src="images/icon.png" alt="课堂同传图标" width="96" height="96">
+    <h1>课堂同传</h1>
+    <p class="lead">上课听不懂英文？老师说的话实时变成字幕，并翻译成中文。</p>
+    <p class="sub">一款免费的课堂同声传译软件，适合留学生上英文课、看英文网课和讲座。看 PPT 时字幕浮在最上层，下课自动整理成课后精讲。</p>
+    <div class="dl">
+      <a class="main" data-asset="arm64.dmg" href="https://github.com/nangua110/class-translator/releases/latest"><b>Mac 下载（苹果芯片）</b><span>M1、M2、M3、M4 等</span></a>
+      <a class="main" data-asset="win-x64-setup.exe" href="https://github.com/nangua110/class-translator/releases/latest"><b>Windows 下载</b><span>Intel / AMD 芯片，大多数电脑</span></a>
+      <a data-asset="x64.dmg" href="https://github.com/nangua110/class-translator/releases/latest"><b>Mac 下载（Intel 芯片）</b><span>2020 年及更早的大多数 Mac</span></a>
+      <a data-asset="win-arm64-setup.exe" href="https://github.com/nangua110/class-translator/releases/latest"><b>Windows 下载（ARM 芯片）</b><span>骁龙笔记本、部分 Surface</span></a>
+    </div>
+    <p class="meta">免费 · Mac + Windows · 预览版 <span id="ver">v0.8.1</span> · Powered by 南瓜</p>
+    <p class="dl-note">不知道是哪种芯片？Mac：点左上角苹果图标 →「关于本机」看「芯片」；Windows：「设置 → 系统 → 系统信息」看「处理器」。</p>
+    <div class="shot"><img src="images/app.png" width="1400" height="854" alt="课堂同传主界面：左边是英文实时字幕和中文翻译，右边是自动整理的课堂笔记"></div>
+  </header>
+
+  <section id="features">
+    <h2>能做什么</h2>
+    <p class="section-lead">从上课听讲到下课复习，一个软件全包。</p>
+    <div class="grid">
+      <div class="card"><h3>实时字幕</h3><p>老师边说边出字，说完一句马上定稿。英语课不用注册、不用填 key 就能用。</p></div>
+      <div class="card"><h3>英译中，翻得准</h3><p>AI 翻译会结合前几句话理解语境，语音识别听错的专业词也能按上下文纠正。</p></div>
+      <div class="card"><h3>悬浮字幕</h3><p>看 PPT 或网课时，字幕浮在所有窗口最上层，PPT 全屏放映也看得到。</p></div>
+      <div class="card"><h3>英文网课也能用</h3><p>直接识别电脑内部的声音，看 YouTube 讲座、线上课、会议都能出字幕。</p></div>
+      <div class="card"><h3>录音回听</h3><p>点任意一句字幕，就从那一句开始回听老师的原话。录音只存在自己电脑上。</p></div>
+      <div class="card"><h3>课后精讲</h3><p>下课一键生成复习资料：章节大纲、讲解、术语表、思考题，可导出 PDF 或 Markdown。</p></div>
+      <div class="card"><h3>课堂笔记</h3><p>上课过程中每隔几分钟自动整理一次要点，走神了也能马上跟上。</p></div>
+      <div class="card"><h3>不联网也有中文</h3><p>内置本地识别和本地翻译，装好就能用；也能接 Gemini、Claude、DeepSeek、OpenAI 或本地模型。</p></div>
+      <div class="card"><h3>课程回顾</h3><p>以前每一节课的笔记、中英对照转写和课后精讲都能随时翻看。</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="split">
+      <div>
+        <h2>看 PPT 时，字幕就浮在上面</h2>
+        <p class="section-lead">专业课 PPT 全屏放映，老师边翻页边讲，再也不用来回切窗口。</p>
+        <ul>
+          <li>只显示老师正在说的这句英文和中文翻译</li>
+          <li>往上拉高，能看到前面几句，一闪而过的话也不会错过</li>
+          <li>可以拖到任意位置，包括另一块屏幕</li>
+          <li>快捷键一键开关：Mac 上 ⌘⇧Y，Windows 上 Ctrl+Shift+Y</li>
+        </ul>
+      </div>
+      <div class="shot"><img src="images/overlay.png" width="1400" height="756" alt="悬浮字幕浮在全屏 PPT 上方，显示英文原句和中文翻译" loading="lazy"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>适合谁</h2>
+    <p class="section-lead">只要是听英语、需要中文帮忙的场景都能用。</p>
+    <div class="who">
+      <div class="card"><h3>留学生上专业课</h3><p>教授语速快、专业词多，边听边看中英字幕，课后再看精讲复习。</p></div>
+      <div class="card"><h3>看英文网课和讲座</h3><p>Coursera、YouTube 公开课、学术讲座，没有中文字幕也能看懂。</p></div>
+      <div class="card"><h3>英文会议和分享</h3><p>线上会议、技术分享、研讨会，实时字幕加会后整理。</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>三步开始用</h2>
+    <ol class="steps">
+      <li><b>下载安装</b>：在上面选和你电脑对应的版本。Mac 把「课堂同传」拖进「应用程序」；Windows 双击安装包一路「下一步」。</li>
+      <li><b>第一次打开</b>：软件暂时没有苹果和微软的签名，系统会拦一下。Mac 到「系统设置 → 隐私与安全」点「仍要打开」；Windows 点「更多信息 → 仍要运行」。<a href="https://github.com/nangua110/class-translator#第一次打开被系统拦住怎么办">图文步骤</a></li>
+      <li><b>开始录制</b>：允许使用麦克风，点「开始录制」，字幕就出来了。想要更准的翻译和课后精讲，再填一个免费的 Gemini key。</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>支持哪些电脑</h2>
+    <table>
+      <tr><th>电脑</th><th>语音识别</th><th>识别电脑内部声音</th></tr>
+      <tr><td>Mac，macOS 26 或更新</td><td>苹果自带、本地实时或云端 Gemini</td><td>可以</td></tr>
+      <tr><td>Mac，macOS 14.2 到 macOS 26 之前</td><td>本地实时（英语）或云端 Gemini</td><td>可以</td></tr>
+      <tr><td>Mac，系统更旧</td><td>本地实时（英语）或云端 Gemini</td><td>不可以</td></tr>
+      <tr><td>Windows 10 / 11</td><td>本地实时（英语）或云端 Gemini</td><td>可以</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>隐私</h2>
+    <p class="section-lead">本地识别、本地翻译和录音都只在你的电脑上，不上传。只有你选择使用 Gemini、Claude 等 AI 模型时，转写的文字才会发给你选的那家服务商。软件里没有统计、没有上传，作者也没有服务器，收不到你的任何数据。课堂录音前，请先确认学校和老师的规定。</p>
+  </section>
+
+  <section id="faq">
+    <h2>常见问题</h2>
+    <details open><summary>上课听不懂英语怎么办？</summary>
+      <p>在电脑上打开课堂同传，它会把老师说的英语实时变成字幕并翻译成中文，没听清的句子随时往回看；打开「保存录音」后还能点字幕回听原话，下课自动生成带术语表的课后精讲，方便复习。</p></details>
+    <details><summary>有没有免费的英文课堂实时翻译软件？</summary>
+      <p>课堂同传是免费的，支持 Mac 和 Windows。英语课不用注册、不用填 key 就能出英文字幕和中文直译；填一个免费的 Gemini key 后，翻译会结合上下文、纠正识别错字，并生成课堂笔记和课后精讲。</p></details>
+    <details><summary>英文网课、视频讲座能实时出中文字幕吗？</summary>
+      <p>可以。课堂同传能直接识别电脑内部的声音，不用麦克风，看网课、YouTube 讲座、线上会议时都能实时出英文字幕和中文翻译，还可以打开悬浮字幕，让字幕浮在视频或 PPT 上面。</p></details>
+    <details><summary>看 PPT 的时候怎么同时看字幕？</summary>
+      <p>点「悬浮字幕」或按快捷键（Mac 上 ⌘⇧Y，Windows 上 Ctrl+Shift+Y），字幕会浮在所有窗口最上层，PPT 全屏放映时也看得到，可以拖动、拉宽、拉高显示多句。</p></details>
+    <details><summary>课堂录音和字幕会上传吗？</summary>
+      <p>本地识别和本地翻译只在你的电脑上处理，不上传；录音只保存在你自己的电脑上。只有你选择使用 Gemini、Claude 等 AI 模型时，转写的文字才会发给你选的那家服务商。作者收不到任何数据。</p></details>
+    <details><summary>怎么更新到新版？</summary>
+      <p>有新版时软件右下角会出现提示，点它打开下载页，下载新的安装包再装一遍就行，课堂记录和设置都会保留。</p></details>
+    <p>更多问题和详细说明见 <a href="https://github.com/nangua110/class-translator#常见问题">GitHub 上的说明文档</a>，遇到问题欢迎在 <a href="https://github.com/nangua110/class-translator/issues">Issues</a> 里反馈。</p>
+  </section>
+
+  <footer>
+    课堂同传 · 开源免费（MIT 许可证） · <a href="https://github.com/nangua110/class-translator">GitHub</a> · Powered by 南瓜
+  </footer>
+</div>
+
+<script>
+// 下载按钮直接指向最新版对应的安装包；查不到时保持指向「最新版」页面
+fetch("https://api.github.com/repos/nangua110/class-translator/releases/latest")
+  .then((r) => (r.ok ? r.json() : null))
+  .then((rel) => {
+    if (!rel || !Array.isArray(rel.assets)) return;
+    if (rel.tag_name) document.getElementById("ver").textContent = rel.tag_name;
+    for (const a of document.querySelectorAll("[data-asset]")) {
+      const hit = rel.assets.find((x) => x.name.endsWith("-" + a.dataset.asset));
+      if (hit) a.href = hit.browser_download_url;
+    }
+  })
+  .catch(() => {});
+</script>
+</body>
+</html>
