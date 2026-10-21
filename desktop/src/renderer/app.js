@@ -3,7 +3,7 @@ const $ = (id) => document.getElementById(id);
 // 中文紧挨着的 **加粗**（如「**孤立系统（isolated system）**中」）标准 Markdown 认不出，先转成 <strong>
 marked.use({ breaks: true });
 const md2html = (md) => marked.parse(md.replace(/\*\*([^*\n]+?)\*\*/g, "<strong>$1</strong>"));
-let ws, ctx, stream, node, timerId;
+let ws, ctx, stream, node, src, timerId;
 let state = "idle"; // idle | recording | paused
 let finishing = false; // 点了结束、后台还在收尾（生成最终笔记）；这期间也可以马上开新课，上一节课照样存盘
 let elapsed = 0, lastTick = 0, summaryMd = "";
@@ -91,6 +91,11 @@ function setState(s) {
 }
 
 navigator.mediaDevices.addEventListener("devicechange", () => listMics()); // 插拔麦克风后自动刷新
+function savedMic() { try { return JSON.parse(localStorage.getItem("mic")); } catch { return null; } }
+$("mic").onchange = () => {
+  const opt = $("mic").selectedOptions[0];
+  try { localStorage.setItem("mic", JSON.stringify({ id: $("mic").value, label: opt?.textContent ?? "" })); } catch {}
+};
 async function listMics() {
   await apiFetch("/api/mic-access", { method: "POST" }); // 先走系统的麦克风授权（Mac）
   // App 里麦克风权限由主进程直接批准，不用像网页版那样先开一次麦克风才能看到设备名；
@@ -99,6 +104,9 @@ async function listMics() {
   const caps = window.APP_INFO?.caps ?? {};
   $("mic").innerHTML = devs.map((d) => `<option value="${d.deviceId}">${d.label || "麦克风"}</option>`).join("")
     + (caps.systemAudio ? `<option value="${SYSTEM}">电脑内部声音（视频/电影）</option>` : "");
+  // 重建列表后选回用户选的那个：连上 / 断开耳机时不跳到「Default」
+  const want = savedMic();
+  $("mic").value = want?.id === SYSTEM && caps.systemAudio ? SYSTEM : pickMic(devs, want);
   if (!devs.length) {
     $("mic").insertAdjacentHTML("afterbegin", '<option value="" disabled>没有找到麦克风</option>');
     if (!caps.systemAudio) $("mic").value = "";
@@ -175,9 +183,7 @@ async function start() {
     stream.getVideoTracks().forEach((t) => t.stop()); // 只要声音
     if (!stream.getAudioTracks().length) throw new Error("没有录到电脑声音");
   } else if (!system) {
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: { deviceId: $("mic").value || undefined, echoCancellation: false, noiseSuppression: true, autoGainControl: true },
-    });
+    stream = await openMic();
   }
   ws = await openSessionSocket();
   ws.onmessage = onMessage;
@@ -187,8 +193,14 @@ async function start() {
     ctx = new AudioContext();
     await ctx.audioWorklet.addModule("worklet.js");
     node = new AudioWorkletNode(ctx, "pcm-capture");
-    node.port.onmessage = (e) => { if (state === "recording" && ws.readyState === 1) ws.send(e.data); };
-    ctx.createMediaStreamSource(stream).connect(node);
+    node.port.onmessage = (e) => {
+      if (state !== "recording" || ws.readyState !== 1) return;
+      ws.send(e.data);
+      if (!loopback) micWatch.feed(new Int16Array(e.data), performance.now());
+    };
+    src = ctx.createMediaStreamSource(stream);
+    src.connect(node);
+    if (!loopback) watchMic();
   }
 
   if (finishing) { finishing = false; $("sumBadge").textContent = ""; } // 上一节课的最终笔记在后台存进记录，不再显示到这节课里
@@ -205,10 +217,58 @@ async function start() {
 function stopLocal() {
   setState("idle");
   clearInterval(timerId);
+  clearInterval(micTimer);
   stream?.getTracks().forEach((t) => t.stop());
   ctx?.close();
-  stream = ctx = null;
+  stream = ctx = src = null;
   setFoot(false);
+}
+
+// ---------- 录音中麦克风断了（连上耳机时系统会把麦克风切走，之后送来的全是 0）：自动重新接上 ----------
+const micWatch = new MicWatch();
+let micTimer, reopening = false, lastReopen = 0, badSince = null, warnedAt = 0;
+async function openMic() {
+  const id = $("mic").value;
+  const audio = (deviceId) => ({ audio: { deviceId, echoCancellation: false, noiseSuppression: true, autoGainControl: true } });
+  // 选了具体的麦克风就必须用它：只写 deviceId 时浏览器可能给「Default」，之后连上耳机就跟着系统跳到耳机上
+  if (!id || id === "default") return navigator.mediaDevices.getUserMedia(audio(id || undefined));
+  try { return await navigator.mediaDevices.getUserMedia(audio({ exact: id })); }
+  catch (e) { if (e?.name === "OverconstrainedError" || e?.name === "NotFoundError") return navigator.mediaDevices.getUserMedia(audio(undefined)); throw e; }
+}
+function watchMic() {
+  micWatch.reset(performance.now());
+  badSince = null; warnedAt = 0;
+  clearInterval(micTimer);
+  micTimer = setInterval(() => {
+    const now = performance.now();
+    if (state !== "recording") return micWatch.reset(now); // 暂停时不发声音，不算断
+    const bad = micWatch.check(now);
+    if (!bad) { if (badSince !== null) setFoot(); badSince = null; return; }
+    badSince ??= now;
+    $("footText").textContent = "麦克风没有声音，正在重新连接…";
+    if (now - badSince > 20000 && now - warnedAt > 60000) { // 重连了一阵还是没声音：告诉用户，别让他以为在正常录
+      warnedAt = now;
+      toast("麦克风一直没有声音：可能被耳机或其他软件占用了，可以换一个麦克风试试");
+    }
+    if (!reopening && now - lastReopen > 3000) reopenMic();
+  }, 500);
+}
+async function reopenMic() {
+  reopening = true; lastReopen = performance.now();
+  try {
+    const fresh = await openMic();
+    if (!ctx || state === "idle") { fresh.getTracks().forEach((t) => t.stop()); return; }
+    const old = stream;
+    src?.disconnect();
+    stream = fresh;
+    src = ctx.createMediaStreamSource(fresh);
+    src.connect(node);
+    old?.getTracks().forEach((t) => t.stop());
+    micWatch.reset(performance.now());
+    console.warn("麦克风没声音，已重新连接", fresh.getAudioTracks()[0]?.label);
+  } catch (e) {
+    console.warn("重新连接麦克风失败", e?.name, e?.message);
+  } finally { reopening = false; }
 }
 
 $("startBtn").onclick = () => start().catch((e) => {
